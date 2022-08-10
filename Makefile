@@ -2,12 +2,15 @@
 .PHONY: b br
 
 b:
-	rm ~/.cargo/.package-cache && cargo build
+	cargo build
+
+clear:
+	rm ~/.cargo/.package-cache
 
 br:
-	rm ~/.cargo/.package-cache && cargo build --release
+	cargo build --release
 
 rr:
-	rm ~/.cargo/.package-cache && cargo run --release -- --dev
+	cargo run --release -- --dev
 
 
