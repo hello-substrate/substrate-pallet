@@ -2,9 +2,12 @@
 .PHONY: b br
 
 b:
-	cd substrate-node-template && rm ~/.cargo/.package-cache && cargo build
+	rm ~/.cargo/.package-cache && cargo build
 
 br:
-	cd substrate-node-template && rm ~/.cargo/.package-cache && cargo build
+	rm ~/.cargo/.package-cache && cargo build --release
+
+rr:
+	rm ~/.cargo/.package-cache && cargo run --release -- --dev
 
 
