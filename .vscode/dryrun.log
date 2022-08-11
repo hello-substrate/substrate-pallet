@@ -1,5 +1,0 @@
-make --dry-run --always-make --keep-going --print-directory
-make: Entering directory `/Users/macbook/Documents/rust/substrate-kitty'
-rm ~/.cargo/.package-cache && cargo build
-make: Leaving directory `/Users/macbook/Documents/rust/substrate-kitty'
- 
