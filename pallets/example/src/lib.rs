@@ -7,7 +7,7 @@ pub use pallet::*;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
+	use frame_support::{pallet_prelude::*, Blake2_128Concat};
 	use frame_system::pallet_prelude::*;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
@@ -21,22 +21,21 @@ pub mod pallet {
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/main-docs/build/runtime-storage/
 	#[pallet::storage]
 	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/main-docs/build/runtime-storage/#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+	pub type Claims<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::Hash, (T::AccountId, T::BlockNumber)>;
 
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/main-docs/build/events-errors/
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
 		SomethingStored(u32, T::AccountId),
+		// 文件证明创建
+		ClaimCreated { who: T::AccountId, claim: T::Hash },
+		// 文件证明取消
+		ClaimRevoked { who: T::AccountId, claim: T::Hash },
 	}
 
 	// Errors inform users that something went wrong.
@@ -44,8 +43,14 @@ pub mod pallet {
 	pub enum Error<T> {
 		/// Error names should be descriptive.
 		NoneValue,
-		/// Errors should have helpful documentation associated with them.
+		/// wneji
 		StorageOverflow,
+		/// 文件已被声明
+		AlreadyClaimed,
+		/// 文件未声明
+		NoSuchClaim,
+		/// 文件不属于自己
+		NoClaimOwner,
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -53,41 +58,35 @@ pub mod pallet {
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
+		/// 创建文件的声明
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/main-docs/build/origins/
+		pub fn create_claim(origin: OriginFor<T>, file_hash: T::Hash) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-
-			// Update storage.
-			<Something<T>>::put(something);
-
+			// 判断文件是否已存在
+			log::info!("{}", Claims::<T>::contains_key(file_hash));
+			ensure!(!Claims::<T>::contains_key(file_hash), Error::<T>::AlreadyClaimed);
+			// 获取当前区块
+			let cur_block_number = frame_system::Pallet::<T>::block_number();
+			// 声明文件
+			Claims::<T>::insert(file_hash, (&who, cur_block_number));
 			// Emit an event.
-			Self::deposit_event(Event::SomethingStored(something, who));
+			Self::deposit_event(Event::ClaimCreated { who, claim: file_hash });
 			// Return a successful DispatchResultWithPostInfo
 			Ok(())
 		}
 
-		/// An example dispatchable that may throw a custom error.
+		/// 取消文件的声明
 		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
-
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => return Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}
+		pub fn revoke_claim(origin: OriginFor<T>, file_hash: T::Hash) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			// 判断这个文件是否已经声明
+			let (owner, _) = Claims::<T>::get(file_hash).ok_or(Error::<T>::NoSuchClaim)?;
+			// 判断这个文件是否自己的?
+			ensure!(who == owner, Error::<T>::NoClaimOwner);
+			// 删除
+			Claims::<T>::remove(file_hash);
+			Self::deposit_event(Event::ClaimRevoked { who, claim: file_hash });
+			Ok(())
 		}
 	}
 }
