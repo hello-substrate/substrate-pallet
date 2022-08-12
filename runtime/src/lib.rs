@@ -272,17 +272,11 @@ impl pallet_template::Config for Runtime {
 
 // local pallet
 
-// kitty
-parameter_types! {
-	// One can owned at most 9,999 Kitties
-	pub const MaxKittyOwned: u32 = 9999;
-}
+// example
+parameter_types! {}
 /// Configure the pallet-kitties in pallets/kitties.
-impl pallet_kitties::Config for Runtime {
+impl pallet_example::Config for Runtime {
 	type Event = Event;
-	type Currency = Balances;
-	type KittyRandomness = RandomnessCollectiveFlip;
-	type MaxKittyOwned = MaxKittyOwned;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -302,7 +296,7 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
-		SubstrateKitties: pallet_kitties,
+		Example: pallet_example,
 	}
 );
 
