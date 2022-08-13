@@ -48,6 +48,8 @@ pub mod pallet {
 	pub enum Error<T> {
 		/// 值溢出
 		Overflow,
+		/// 添加的值大于
+		AddValMustLessEqual(u16),
 	}
 
 	/// SingleValue在块执行结束时运行ClearFrequency的函数中的每个块数都设置为 0
@@ -76,7 +78,8 @@ pub mod pallet {
 		pub fn add_value(origin: OriginFor<T>, val_to_add: u32) -> DispatchResult {
 			let _ = ensure_signed(origin)?;
 			// 判断添加的值是否符合
-			ensure!(val_to_add <= T::MaxAddend::get(), "value must be <= MaxAddend");
+			let max = T::MaxAddend::get();
+			ensure!(val_to_add <= max, Error::<T>::AddValMustLessEqual(max as u16));
 
 			let old_val = SingleValue::<T>::get();
 			let new_val = old_val.checked_add(val_to_add).ok_or(Error::<T>::Overflow)?;
