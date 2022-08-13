@@ -271,12 +271,16 @@ impl pallet_template::Config for Runtime {
 }
 
 // local pallet
-
 // example
-parameter_types! {}
-/// Configure the pallet-kitties in pallets/kitties.
+parameter_types! {
+	pub const MaxAddend:u32 = 100;
+	pub const ClearFrequency:u32 = 10;
+}
+/// Configure the pallet-example in pallets/example.
 impl pallet_example::Config for Runtime {
 	type Event = Event;
+	type MaxAddend = MaxAddend;
+	type ClearFrequency = ClearFrequency;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

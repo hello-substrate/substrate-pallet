@@ -7,7 +7,7 @@ pub use pallet::*;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
+	use frame_support::{pallet_prelude::*, sp_runtime::traits::Zero};
 	use frame_system::pallet_prelude::*;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
@@ -15,37 +15,56 @@ pub mod pallet {
 	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+
+		#[pallet::constant]
+		/// Maximum amount added per invocation.
+		type MaxAddend: Get<u32>;
+		/// Frequency with which the stored value is deleted.
+		type ClearFrequency: Get<Self::BlockNumber>;
 	}
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/main-docs/build/runtime-storage/
+	// 声明SingleValue每个块周期都会修改的值。
 	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/main-docs/build/runtime-storage/#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+	#[pallet::getter(fn single_value)]
+	pub type SingleValue<T> = StorageValue<_, u32, ValueQuery>;
 
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/main-docs/build/events-errors/
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, T::AccountId),
+		/// SingleValue 加上新值 （初始值,添加值,最终值)
+		Added(u32, u32, u32),
+		//// 被清除 (删除之前的值)
+		Cleared(u32),
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+		/// 值溢出
+		Overflow,
+	}
+
+	/// SingleValue在块执行结束时运行ClearFrequency的函数中的每个块数都设置为 0
+	/// 在#[pallet::hooks]属性on_finalize下指定此逻辑：
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_finalize(n: BlockNumberFor<T>) {
+			// 如果当前块 % 清理周期 = 0 则清除
+			if (n % T::ClearFrequency::get()).is_zero() {
+				// 获取当前数据
+				let old_value = SingleValue::<T>::get();
+				// 清理
+				SingleValue::<T>::put(0);
+				// 发送事件
+				Self::deposit_event(Event::Cleared(old_value));
+			}
+		}
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -53,41 +72,17 @@ pub mod pallet {
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/main-docs/build/origins/
-			let who = ensure_signed(origin)?;
+		#[pallet::weight(1_000)]
+		pub fn add_value(origin: OriginFor<T>, val_to_add: u32) -> DispatchResult {
+			let _ = ensure_signed(origin)?;
+			// 判断添加的值是否符合
+			ensure!(val_to_add <= T::MaxAddend::get(), "value must be <= MaxAddend");
 
-			// Update storage.
-			<Something<T>>::put(something);
-
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored(something, who));
-			// Return a successful DispatchResultWithPostInfo
+			let old_val = SingleValue::<T>::get();
+			let new_val = old_val.checked_add(val_to_add).ok_or(Error::<T>::Overflow)?;
+			SingleValue::<T>::put(new_val);
+			Self::deposit_event(Event::Added(old_val, val_to_add, new_val));
 			Ok(())
-		}
-
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
-
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => return Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}
 		}
 	}
 }
