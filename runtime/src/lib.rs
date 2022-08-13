@@ -271,10 +271,9 @@ impl pallet_template::Config for Runtime {
 }
 
 // local pallet
-
 // example
 parameter_types! {}
-/// Configure the pallet-kitties in pallets/kitties.
+/// Configure the pallet-example in pallets/example.
 impl pallet_example::Config for Runtime {
 	type Event = Event;
 }
