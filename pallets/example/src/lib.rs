@@ -9,6 +9,7 @@ pub mod pallet {
 		traits::{tokens::ExistenceRequirement, Currency, Randomness},
 	};
 	use frame_system::pallet_prelude::*;
+	use log::info;
 	use scale_info::TypeInfo;
 	use sp_io::hashing::blake2_128;
 
@@ -20,13 +21,13 @@ pub mod pallet {
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
-	// type KittyDNA = [u8; 16];
-	
+	type KittyDNA = [u8; 16];
+
 	// kitty的信息
 	#[derive(Clone, Encode, Decode, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	pub struct Kitty<T: Config> {
-		pub dna: [u8; 16],               // dna 为16字节数组
+		pub dna: KittyDNA,               // dna 为16字节数组
 		pub price: Option<BalanceOf<T>>, // 价位none未出售
 		pub gender: Gender,
 		pub owner: AccountOf<T>,
@@ -91,13 +92,13 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// A new Kitty was sucessfully created. \[sender, kitty_dna\]
-		Created(T::AccountId, [u8; 16]),
+		Created(T::AccountId, KittyDNA),
 		/// Kitty price was sucessfully set. \[sender, kitty_id, new_price\]
-		PriceSet(T::AccountId, [u8; 16], Option<BalanceOf<T>>),
+		PriceSet(T::AccountId, KittyDNA, Option<BalanceOf<T>>),
 		/// A Kitty was sucessfully transferred. \[from, to, kitty_id\]
-		Transferred(T::AccountId, T::AccountId, [u8; 16]),
+		Transferred(T::AccountId, T::AccountId, KittyDNA),
 		/// A Kitty was sucessfully bought. \[buyer, seller, kitty_id, bid_price\]
-		Bought(T::AccountId, T::AccountId, [u8; 16], BalanceOf<T>),
+		Bought(T::AccountId, T::AccountId, KittyDNA, BalanceOf<T>),
 	}
 
 	// Storage items.
@@ -109,7 +110,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn kitties)]
 	/// Maps the Kitty struct to the Kitty DNA.
-	pub(super) type Kitties<T: Config> = StorageMap<_, Twox64Concat, [u8; 16], Kitty<T>>;
+	pub(super) type Kitties<T: Config> = StorageMap<_, Twox64Concat, KittyDNA, Kitty<T>>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn kitties_owned)]
@@ -118,14 +119,14 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		T::AccountId,
-		BoundedVec<[u8; 16], T::MaxKittyOwned>,
+		BoundedVec<KittyDNA, T::MaxKittyOwned>,
 		ValueQuery,
 	>;
 
 	// Our pallet's genesis configuration.
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
-		pub kitties: Vec<(T::AccountId, [u8; 16], Gender)>,
+		pub kitties: Vec<(T::AccountId, KittyDNA, Gender)>,
 	}
 
 	// Required to implement default for GenesisConfig.
@@ -180,8 +181,8 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn breed_kitty(
 			origin: OriginFor<T>,
-			parent_1: [u8; 16],
-			parent_2: [u8; 16],
+			parent_1: KittyDNA,
+			parent_2: KittyDNA,
 		) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
 			// Check both parents are owner by the caller of this function.
@@ -204,7 +205,7 @@ pub mod pallet {
 		pub fn transfer(
 			origin: OriginFor<T>,
 			to: T::AccountId,
-			kitty_id: [u8; 16],
+			kitty_id: KittyDNA,
 		) -> DispatchResult {
 			let from = ensure_signed(origin)?;
 
@@ -237,7 +238,7 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn buy_kitty(
 			origin: OriginFor<T>,
-			kitty_id: [u8; 16],
+			kitty_id: KittyDNA,
 			bid_price: BalanceOf<T>,
 		) -> DispatchResult {
 			let buyer = ensure_signed(origin)?;
@@ -282,7 +283,7 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn set_price(
 			origin: OriginFor<T>,
-			kitty_id: [u8; 16],
+			kitty_id: KittyDNA,
 			new_price: Option<BalanceOf<T>>,
 		) -> DispatchResult {
 			let sender = ensure_signed(origin)?;
@@ -292,7 +293,6 @@ pub mod pallet {
 
 			let mut kitty = Self::kitties(&kitty_id).ok_or(<Error<T>>::NonExistantKitty)?;
 
-			println!("{new_price:?}");
 			kitty.price = new_price.clone();
 			<Kitties<T>>::insert(&kitty_id, kitty);
 
@@ -307,7 +307,7 @@ pub mod pallet {
 
 	impl<T: Config> Pallet<T> {
 		// Generates and returns DNA and Gender
-		fn gen_dna() -> ([u8; 16], Gender) {
+		fn gen_dna() -> (KittyDNA, Gender) {
 			// Create randomness
 			let random = T::KittyRandomness::random(&b"dna"[..]).0;
 
@@ -318,7 +318,7 @@ pub mod pallet {
 				<frame_system::Pallet<T>>::block_number(),
 			);
 
-			println!("{:?}", random.as_ref());
+			info!("{:?}", random.as_ref());
 
 			if random.as_ref()[0] % 2 == 0 {
 				return (payload.using_encoded(blake2_128), Gender::Male)
@@ -337,7 +337,7 @@ pub mod pallet {
 		}
 
 		// Generates a new Kitty using existing Kitties.
-		pub fn breed_dna(parent1: &[u8; 16], parent2: &[u8; 16]) -> ([u8; 16], Gender) {
+		pub fn breed_dna(parent1: &KittyDNA, parent2: &KittyDNA) -> (KittyDNA, Gender) {
 			let (mut new_dna, new_gender) = Self::gen_dna();
 
 			for i in 0..new_dna.len() {
@@ -349,9 +349,9 @@ pub mod pallet {
 		// Helper to mint a Kitty.
 		pub fn mint(
 			owner: &T::AccountId,
-			dna: [u8; 16],
+			dna: KittyDNA,
 			gender: Gender,
-		) -> Result<[u8; 16], Error<T>> {
+		) -> Result<KittyDNA, Error<T>> {
 			// Create a new object.
 			let kitty = Kitty::<T> {
 				dna: dna.clone(),
@@ -377,7 +377,7 @@ pub mod pallet {
 		}
 
 		// Check whether Kitty is owner by the breeder.
-		pub fn check_owner(kitty_dna: &[u8; 16], breeder: &T::AccountId) -> bool {
+		pub fn check_owner(kitty_dna: &KittyDNA, breeder: &T::AccountId) -> bool {
 			match Self::kitties(kitty_dna) {
 				Some(kitty) => kitty.owner == *breeder,
 				None => false,
@@ -385,7 +385,7 @@ pub mod pallet {
 		}
 
 		// Update storage to transfer kitty.
-		pub fn transfer_kitty_to(kitty_id: &[u8; 16], to: &T::AccountId) -> Result<(), Error<T>> {
+		pub fn transfer_kitty_to(kitty_id: &KittyDNA, to: &T::AccountId) -> Result<(), Error<T>> {
 			let mut kitty = Self::kitties(&kitty_id).ok_or(<Error<T>>::NonExistantKitty)?;
 
 			let prev_owner = kitty.owner.clone();
