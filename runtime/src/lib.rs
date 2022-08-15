@@ -270,10 +270,7 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
-// local pallet
-// example
-parameter_types! {}
-/// Configure the pallet-example in pallets/example.
+// local
 impl pallet_example::Config for Runtime {
 	type Event = Event;
 }
@@ -295,7 +292,8 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
-		Example: pallet_example,
+		// local
+		ExampleModule: pallet_example,
 	}
 );
 
@@ -341,6 +339,7 @@ mod benches {
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
 		[pallet_template, TemplateModule]
+		[pallet_example, ExampleModule]
 	);
 }
 
