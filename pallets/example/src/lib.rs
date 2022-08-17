@@ -1,6 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use frame_support::PalletId;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// <https://docs.substrate.io/reference/frame-pallets/>
@@ -11,12 +10,16 @@ pub use pallet::*;
 pub mod pallet {
 	use super::*;
 	use frame_support::{
+		inherent::Vec,
 		pallet_prelude::*,
 		sp_runtime::traits::Zero,
+		storage::child,
 		traits::{Currency, ExistenceRequirement, ReservableCurrency, WithdrawReasons},
+		PalletId,
 	};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::AccountIdConversion;
+	use sp_core::Hasher;
+	use sp_runtime::traits::{AccountIdConversion, Saturating};
 
 	// 类型别名与结构体声明处
 	/// pallet identifier
@@ -86,6 +89,10 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// 创建基金 [fund_id, BlockNumber]
 		Created(FundID, T::BlockNumber),
+		/// 捐赠
+		Contributed(FundID, T::AccountId, BalanceOf<T>, T::BlockNumber),
+		/// 提现
+		Withdrew(FundID, T::AccountId, BalanceOf<T>, T::BlockNumber),
 	}
 
 	// 错误
@@ -95,6 +102,16 @@ pub mod pallet {
 		EndTooEarly,
 		/// 基金总数溢出
 		FundCountOverflow,
+		/// 捐赠金额太少
+		ContributeTooSmall,
+		/// 未找到基金信息
+		FundNotFound,
+		/// 基金已经结束
+		FundIsEnd,
+		/// 基金为结束
+		Funding,
+		/// 捐赠者才可提取
+		NoContribute,
 	}
 
 	// 调度函数
@@ -125,7 +142,7 @@ pub mod pallet {
 			let fund_id = FundCount::<T>::get();
 			let fund_id = fund_id.checked_add(1).ok_or(Error::<T>::FundCountOverflow)?;
 			// 创建账户不需要支付手续费,不使用`transfer`
-			T::Currency::resolve_creating(&Self::gen_fund_account_id(fund_id), imbalance);
+			T::Currency::resolve_creating(&Self::get_fund_account_id(fund_id), imbalance);
 			// 基金信息入库
 			Funds::<T>::insert(
 				fund_id,
@@ -142,11 +159,106 @@ pub mod pallet {
 			// Return a successful DispatchResultWithPostInfo
 			Ok(())
 		}
+		/// 捐赠基金
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn contribute(
+			origin: OriginFor<T>,
+			fund_id: FundID,
+			value: BalanceOf<T>,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			// 判断捐赠金额达标
+			ensure!(value >= T::MinContribution::get(), Error::<T>::ContributeTooSmall);
+			// 获取基金信息
+			let fund_info = Funds::<T>::get(fund_id).ok_or(Error::<T>::FundNotFound)?;
+			// 确保基金尚未结束
+			let now_block = frame_system::Pallet::<T>::block_number();
+			ensure!(fund_info.end_block >= now_block, Error::<T>::FundIsEnd);
+			// 捐赠逻辑
+			T::Currency::transfer(
+				&who,
+				&Self::get_fund_account_id(fund_id),
+				value,
+				ExistenceRequirement::AllowDeath,
+			)?;
+			// 更新基金信息
+			fund_info.total_raised.saturating_add(value);
+			Funds::<T>::insert(fund_id, &fund_info);
+			// 更新捐赠者的捐赠金额
+			let balance = Self::contribute_get(fund_id, &who);
+			let balance = balance.saturating_add(value);
+			Self::contribute_put(fund_id, &who, balance);
+			// 发送事件
+			Self::deposit_event(Event::Contributed(fund_id, who, value, now_block));
+			Ok(())
+		}
+
+		/// 基金捐赠者提现
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn withdraw(origin: OriginFor<T>, fund_id: FundID) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			// 确保基金未结束
+			let fund_info = Funds::<T>::get(fund_id).ok_or(Error::<T>::FundNotFound)?;
+			let now_block = frame_system::Pallet::<T>::block_number();
+			ensure!(fund_info.end_block < now_block, Error::<T>::Funding);
+			// 确保捐赠的金额大于0
+			let balance = Self::contribute_get(fund_id, &who);
+			ensure!(balance > Zero::zero(), Error::<T>::NoContribute);
+			// 将基金发给受益者,不收取手续费
+			let _ = T::Currency::resolve_into_existing(
+				&who,
+				T::Currency::withdraw(
+					&Self::get_fund_account_id(fund_id),
+					balance,
+					WithdrawReasons::TRANSFER,
+					ExistenceRequirement::AllowDeath,
+				)?,
+			);
+			// 删除捐赠信息
+			Self::contribute_kill(fund_id, &who);
+			// 更新 total_raised
+			fund_info.total_raised.saturating_sub(balance);
+			Funds::<T>::insert(fund_id, &fund_info);
+			Self::deposit_event(Event::Withdrew(fund_id, who, balance, now_block));
+			Ok(())
+		}
+
+		/// 在基金过期之后，人人都可解散基金,并获取押金奖励
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn dissolve(origin: OriginFor<T>, fund_id: FundID) -> DispatchResult {
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
-		pub fn gen_fund_account_id(id: FundID) -> T::AccountId {
+		pub fn get_fund_account_id(id: FundID) -> T::AccountId {
 			PALLET_ID.into_sub_account_truncating(id)
+		}
+
+		// 实例化子存储
+		pub fn get_child_from_id(id: FundID) -> child::ChildInfo {
+			let mut buf = Vec::new();
+			buf.extend_from_slice(b"crowdfund");
+			buf.extend_from_slice(&id.to_le_bytes());
+			child::ChildInfo::new_default(T::Hashing::hash(&buf[..]).as_ref())
+		}
+		// 在 child trie 中 记录捐赠金额
+		pub fn contribute_put(id: FundID, who: &T::AccountId, balance: BalanceOf<T>) {
+			let child_info = Self::get_child_from_id(id);
+			// 将 who 转换为切片，然后用它调用给定的闭包。
+			who.using_encoded(|who| child::put(&child_info, who, &balance))
+		}
+		// 获取捐赠金额
+		pub fn contribute_get(id: FundID, who: &T::AccountId) -> BalanceOf<T> {
+			let child_info = Self::get_child_from_id(id);
+			// 将 who 转换为切片，然后用它调用给定的闭包。
+			who.using_encoded(|who| child::get_or_default(&child_info, who))
+		}
+		// 删除捐赠金额
+		pub fn contribute_kill(id: FundID, who: &T::AccountId) {
+			let child_info = Self::get_child_from_id(id);
+			// 将 who 转换为切片，然后用它调用给定的闭包。
+			who.using_encoded(|who| child::kill(&child_info, who));
 		}
 	}
 }
