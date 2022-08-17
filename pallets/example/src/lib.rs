@@ -15,7 +15,8 @@ mod tests;
 mod benchmarking;
 
 
-/// pallet逻辑的定义, 在`runtime/src/lib.rs`通过`construct_runtime`聚合 
+
+/// pallet逻辑的定义, 在`runtime/src/lib.rs`通过`construct_runtime`聚合
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::pallet_prelude::*;
@@ -84,7 +85,7 @@ pub mod pallet {
 		}
 
 		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
+		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1, 1))]
 		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
 			let _who = ensure_signed(origin)?;
 
