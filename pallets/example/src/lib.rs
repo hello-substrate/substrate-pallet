@@ -10,6 +10,7 @@ pub use pallet::*;
 pub mod pallet {
 	use super::*;
 	use frame_support::{
+		ensure,
 		inherent::Vec,
 		pallet_prelude::*,
 		sp_runtime::traits::Zero,
@@ -17,7 +18,7 @@ pub mod pallet {
 		traits::{Currency, ExistenceRequirement, ReservableCurrency, WithdrawReasons},
 		PalletId,
 	};
-	use frame_system::pallet_prelude::*;
+	use frame_system::{ensure_signed, pallet_prelude::*};
 	use sp_core::Hasher;
 	use sp_runtime::traits::{AccountIdConversion, Saturating};
 
@@ -64,7 +65,7 @@ pub mod pallet {
 		/// 最小捐款金额
 		type MinContribution: Get<BalanceOf<Self>>;
 		/// 众筹失败后可清理的时间限制(以块为单位),在这之前可以提前基金,超过时间限制则会失去
-		type FailTakePeriod: Get<Self::BlockNumber>;
+		type InvalidPeriod: Get<Self::BlockNumber>;
 	}
 
 	// pallet 类型的简单声明。它是我们用来实现traits和method的占位符。
@@ -93,6 +94,10 @@ pub mod pallet {
 		Contributed(FundID, T::AccountId, BalanceOf<T>, T::BlockNumber),
 		/// 提现
 		Withdrew(FundID, T::AccountId, BalanceOf<T>, T::BlockNumber),
+		// 清理过期的基金
+		Dissolved(FundID, T::AccountId, T::BlockNumber),
+		// 分发基金奖励
+		Dispensed(FundID, T::AccountId, T::BlockNumber),
 	}
 
 	// 错误
@@ -108,10 +113,14 @@ pub mod pallet {
 		FundNotFound,
 		/// 基金已经结束
 		FundIsEnd,
-		/// 基金为结束
-		Funding,
+		/// 基金未结束
+		FundNotEnd,
 		/// 捐赠者才可提取
 		NoContribute,
+		/// 基金未失效
+		FundNotInvalid,
+		/// 筹集失败
+		UnsuccessFund,
 	}
 
 	// 调度函数
@@ -200,7 +209,7 @@ pub mod pallet {
 			// 确保基金未结束
 			let fund_info = Funds::<T>::get(fund_id).ok_or(Error::<T>::FundNotFound)?;
 			let now_block = frame_system::Pallet::<T>::block_number();
-			ensure!(fund_info.end_block < now_block, Error::<T>::Funding);
+			ensure!(fund_info.end_block < now_block, Error::<T>::FundNotEnd);
 			// 确保捐赠的金额大于0
 			let balance = Self::contribute_get(fund_id, &who);
 			ensure!(balance > Zero::zero(), Error::<T>::NoContribute);
@@ -226,6 +235,71 @@ pub mod pallet {
 		/// 在基金过期之后，人人都可解散基金,并获取押金奖励
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn dissolve(origin: OriginFor<T>, fund_id: FundID) -> DispatchResult {
+			let caller = ensure_signed(origin)?;
+			// 获取基金信息,判断基金是否过期
+			let fund_info = Funds::<T>::get(fund_id).ok_or(Error::<T>::FundNotFound)?;
+			let now_block = frame_system::Pallet::<T>::block_number();
+			ensure!(
+				now_block >= fund_info.end_block + T::InvalidPeriod::get(),
+				Error::<T>::FundNotInvalid
+			);
+			// 将基金剩余余额奖励给调用者
+			let _ = T::Currency::resolve_creating(
+				&caller,
+				T::Currency::withdraw(
+					&Self::get_fund_account_id(fund_id),
+					fund_info.deposit + fund_info.total_raised,
+					WithdrawReasons::TRANSFER,
+					ExistenceRequirement::AllowDeath,
+				)?,
+			);
+			// 清理存储数据
+			Funds::<T>::remove(fund_id);
+			// 删除众筹(一次写即可删除众筹的信息, 因为使用了 child tree)
+			Self::crowdfund_kill(fund_id);
+			Self::deposit_event(Event::<T>::Dissolved(fund_id, caller, now_block));
+			Ok(())
+		}
+
+		/// Dispense a payment to the beneficiary of a successful crowdfund.
+		/// The beneficiary receives the contributed funds and the caller receives
+		/// the deposit as a reward to incentivize clearing settled crowdfunds out of storage.
+		/// 基金成功筹集,分发捐赠的基金给受益者和分发清理众筹存储空间的奖励给调用者
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn dispense(origin: OriginFor<T>, fund_id: FundID) -> DispatchResult {
+			let caller = ensure_signed(origin)?;
+			// 获取基金信息,判断基金是否结束
+			let fund_info = Funds::<T>::get(fund_id).ok_or(Error::<T>::FundNotFound)?;
+			let now_block = frame_system::Pallet::<T>::block_number();
+			ensure!(now_block >= fund_info.end_block, Error::<T>::FundNotEnd);
+			// 确保基金众筹成功
+			ensure!(fund_info.total_raised >= fund_info.goal_raise, Error::<T>::UnsuccessFund);
+			let fund_account = Self::get_fund_account_id(fund_id);
+			// 受益者分配捐赠的基金
+			T::Currency::resolve_creating(
+				&fund_info.beneficiary_account_id,
+				T::Currency::withdraw(
+					&fund_account,
+					fund_info.total_raised,
+					WithdrawReasons::TRANSFER,
+					ExistenceRequirement::AllowDeath,
+				)?,
+			);
+			// 调用者分配押金
+			T::Currency::resolve_creating(
+				&caller,
+				T::Currency::withdraw(
+					&fund_account,
+					fund_info.deposit,
+					WithdrawReasons::TRANSFER,
+					ExistenceRequirement::AllowDeath,
+				)?,
+			);
+			// 清理存储数据
+			Funds::<T>::remove(fund_id);
+			// 删除众筹(一次写即可删除众筹的信息, 因为使用了 child tree)
+			Self::crowdfund_kill(fund_id);
+			Self::deposit_event(Event::<T>::Dispensed(fund_id, caller, now_block));
 			Ok(())
 		}
 	}
@@ -259,6 +333,11 @@ pub mod pallet {
 			let child_info = Self::get_child_from_id(id);
 			// 将 who 转换为切片，然后用它调用给定的闭包。
 			who.using_encoded(|who| child::kill(&child_info, who));
+		}
+		/// 删除捐赠的信息
+		pub fn crowdfund_kill(id: FundID) {
+			let child_info = Self::get_child_from_id(id);
+			let _ = child::clear_storage(&child_info, None, None);
 		}
 	}
 }
