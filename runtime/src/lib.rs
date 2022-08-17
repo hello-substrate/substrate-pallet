@@ -271,8 +271,17 @@ impl pallet_template::Config for Runtime {
 }
 
 // local
+parameter_types! {
+	pub const SubmitterDeposit: u128 = 10;
+	pub const MinContribution: u128 = 10;
+	pub const FailTakePeriod: u32 = 10;
+}
 impl pallet_example::Config for Runtime {
 	type Event = Event;
+	type Currency = Balances;
+	type SubmitterDeposit = SubmitterDeposit;
+	type MinContribution = MinContribution;
+	type FailTakePeriod = FailTakePeriod;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

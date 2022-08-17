@@ -1,32 +1,67 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use frame_support::PalletId;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
 
-#[cfg(test)]
-mod mock;
-
-#[cfg(test)]
-mod tests;
-
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
-
-
-
 /// pallet逻辑的定义, 在`runtime/src/lib.rs`通过`construct_runtime`聚合
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
+	use super::*;
+	use frame_support::{
+		pallet_prelude::*,
+		sp_runtime::traits::Zero,
+		traits::{Currency, ExistenceRequirement, ReservableCurrency, WithdrawReasons},
+	};
 	use frame_system::pallet_prelude::*;
+	use sp_runtime::traits::AccountIdConversion;
+
+	// 类型别名与结构体声明处
+	/// pallet identifier
+	const PALLET_ID: PalletId = PalletId(*b"ex/cfund");
+
+	/// 基金ID
+	type FundID = u32;
+	/// 账户ID
+	type AccountIDOf<T> = <T as frame_system::Config>::AccountId;
+	/// 余额
+	type BalanceOf<T> = <<T as Config>::Currency as Currency<AccountIDOf<T>>>::Balance;
+	/// 基金信息
+	type FundInfoOf<T> =
+		FundInfo<AccountIDOf<T>, BalanceOf<T>, <T as frame_system::Config>::BlockNumber>;
+
+	/// 基金信息
+	#[derive(Clone, Encode, Decode, Eq, PartialEq, Default, TypeInfo, MaxEncodedLen)]
+	#[scale_info(skip_type_params(T))]
+	#[cfg_attr(feature = "std", derive(Debug))]
+	pub struct FundInfo<AccountID, Balance, BlockNumber> {
+		/// 接受基金的账户ID
+		beneficiary_account_id: AccountID,
+		/// 押金金额
+		deposit: Balance,
+		/// 筹集的总金额
+		total_raised: Balance,
+		/// 截止日期(block number)
+		end_block: BlockNumber,
+		/// 众筹的目标金额
+		goal_raise: Balance,
+	}
 
 	/// pallet config trait, 所有的类型和常量`constant`在这里配置
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		/// 货币
+		type Currency: ReservableCurrency<Self::AccountId>;
+		/// 众筹发起者的保证金(押金)
+		type SubmitterDeposit: Get<BalanceOf<Self>>;
+		/// 最小捐款金额
+		type MinContribution: Get<BalanceOf<Self>>;
+		/// 众筹失败后可清理的时间限制(以块为单位),在这之前可以提前基金,超过时间限制则会失去
+		type FailTakePeriod: Get<Self::BlockNumber>;
 	}
 
 	// pallet 类型的简单声明。它是我们用来实现traits和method的占位符。
@@ -34,73 +69,84 @@ pub mod pallet {
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/main-docs/build/runtime-storage/
+	// 存储
+	/// 所有的基金信息
 	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/main-docs/build/runtime-storage/#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+	#[pallet::getter(fn get_funds)]
+	pub type Funds<T: Config> = StorageMap<_, Blake2_128Concat, FundID, FundInfoOf<T>>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/main-docs/build/events-errors/
+	/// 基金总数
+	#[pallet::storage]
+	#[pallet::getter(fn get_fund_count)]
+	pub type FundCount<T> = StorageValue<_, FundID, ValueQuery>;
+
+	// 事件
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, T::AccountId),
+		/// 创建基金 [fund_id, BlockNumber]
+		Created(FundID, T::BlockNumber),
 	}
 
-	// Errors inform users that something went wrong.
+	// 错误
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+		/// 结束太早
+		EndTooEarly,
+		/// 基金总数溢出
+		FundCountOverflow,
 	}
 
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
+	// 调度函数
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
+		/// 创建一个基金
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/main-docs/build/origins/
-			let who = ensure_signed(origin)?;
-
-			// Update storage.
-			<Something<T>>::put(something);
-
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored(something, who));
+		pub fn create_fund(
+			origin: OriginFor<T>,
+			beneficiary_account_id: AccountIDOf<T>,
+			goal_raise: BalanceOf<T>,
+			end_block: T::BlockNumber,
+		) -> DispatchResult {
+			let caller = ensure_signed(origin)?;
+			// 获取现在区块
+			let now_block = <frame_system::Pallet<T>>::block_number();
+			// 检查结束块是否早与当前块
+			ensure!(end_block > now_block, Error::<T>::EndTooEarly);
+			// 提取创建押金
+			let submitter_deposit = T::SubmitterDeposit::get();
+			let imbalance = T::Currency::withdraw(
+				&caller,
+				submitter_deposit,
+				WithdrawReasons::TRANSFER,
+				ExistenceRequirement::AllowDeath,
+			)?;
+			// 基金 id 自增1
+			let fund_id = FundCount::<T>::get();
+			let fund_id = fund_id.checked_add(1).ok_or(Error::<T>::FundCountOverflow)?;
+			// 创建账户不需要支付手续费,不使用`transfer`
+			T::Currency::resolve_creating(&Self::gen_fund_account_id(fund_id), imbalance);
+			// 基金信息入库
+			Funds::<T>::insert(
+				fund_id,
+				FundInfo {
+					beneficiary_account_id,
+					deposit: submitter_deposit,
+					total_raised: Zero::zero(),
+					end_block,
+					goal_raise,
+				},
+			);
+			// 发送事件
+			Self::deposit_event(Event::Created(fund_id, now_block));
 			// Return a successful DispatchResultWithPostInfo
 			Ok(())
 		}
+	}
 
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1, 1))]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
-
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => return Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}
+	impl<T: Config> Pallet<T> {
+		pub fn gen_fund_account_id(id: FundID) -> T::AccountId {
+			PALLET_ID.into_sub_account_truncating(id)
 		}
 	}
 }
