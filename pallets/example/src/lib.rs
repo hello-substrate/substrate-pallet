@@ -5,6 +5,12 @@
 /// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
 
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
 /// pallet逻辑的定义, 在`runtime/src/lib.rs`通过`construct_runtime`聚合
 #[frame_support::pallet]
 pub mod pallet {
@@ -65,7 +71,7 @@ pub mod pallet {
 		/// 最小捐款金额
 		type MinContribution: Get<BalanceOf<Self>>;
 		/// 众筹失败后可清理的时间限制(以块为单位),在这之前可以提前基金,超过时间限制则会失去
-		type InvalidPeriod: Get<Self::BlockNumber>;
+		type ExpirePeriod: Get<Self::BlockNumber>;
 	}
 
 	// pallet 类型的简单声明。它是我们用来实现traits和method的占位符。
@@ -240,7 +246,7 @@ pub mod pallet {
 			let fund_info = Funds::<T>::get(fund_id).ok_or(Error::<T>::FundNotFound)?;
 			let now_block = frame_system::Pallet::<T>::block_number();
 			ensure!(
-				now_block >= fund_info.end_block + T::InvalidPeriod::get(),
+				now_block >= fund_info.end_block + T::ExpirePeriod::get(),
 				Error::<T>::FundNotInvalid
 			);
 			// 将基金剩余余额奖励给调用者
@@ -261,10 +267,9 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Dispense a payment to the beneficiary of a successful crowdfund.
-		/// The beneficiary receives the contributed funds and the caller receives
-		/// the deposit as a reward to incentivize clearing settled crowdfunds out of storage.
-		/// 基金成功筹集,分发捐赠的基金给受益者和分发清理众筹存储空间的奖励给调用者
+		/// 基金成功筹集.
+		/// 分发捐赠的基金给受益者.
+		/// 分发押金奖励给调用者清理众筹存储空间
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn dispense(origin: OriginFor<T>, fund_id: FundID) -> DispatchResult {
 			let caller = ensure_signed(origin)?;
@@ -305,33 +310,31 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		/// 基金的账户ID
 		pub fn get_fund_account_id(id: FundID) -> T::AccountId {
 			PALLET_ID.into_sub_account_truncating(id)
 		}
-
-		// 实例化子存储
+		/// 实例化子存储
 		pub fn get_child_from_id(id: FundID) -> child::ChildInfo {
 			let mut buf = Vec::new();
 			buf.extend_from_slice(b"crowdfund");
 			buf.extend_from_slice(&id.to_le_bytes());
 			child::ChildInfo::new_default(T::Hashing::hash(&buf[..]).as_ref())
 		}
-		// 在 child trie 中 记录捐赠金额
+		/// 在 child trie 中 记录捐赠金额
 		pub fn contribute_put(id: FundID, who: &T::AccountId, balance: BalanceOf<T>) {
 			let child_info = Self::get_child_from_id(id);
 			// 将 who 转换为切片，然后用它调用给定的闭包。
 			who.using_encoded(|who| child::put(&child_info, who, &balance))
 		}
-		// 获取捐赠金额
+		/// 获取捐赠金额
 		pub fn contribute_get(id: FundID, who: &T::AccountId) -> BalanceOf<T> {
 			let child_info = Self::get_child_from_id(id);
-			// 将 who 转换为切片，然后用它调用给定的闭包。
 			who.using_encoded(|who| child::get_or_default(&child_info, who))
 		}
-		// 删除捐赠金额
+		/// 删除捐赠金额
 		pub fn contribute_kill(id: FundID, who: &T::AccountId) {
 			let child_info = Self::get_child_from_id(id);
-			// 将 who 转换为切片，然后用它调用给定的闭包。
 			who.using_encoded(|who| child::kill(&child_info, who));
 		}
 		/// 删除捐赠的信息
