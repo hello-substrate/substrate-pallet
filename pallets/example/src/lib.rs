@@ -48,15 +48,15 @@ pub mod pallet {
 	#[cfg_attr(feature = "std", derive(Debug))]
 	pub struct FundInfo<AccountID, Balance, BlockNumber> {
 		/// 接受基金的账户ID
-		beneficiary_account_id: AccountID,
+		pub beneficiary_account_id: AccountID,
 		/// 押金金额
-		deposit: Balance,
+		pub deposit: Balance,
 		/// 筹集的总金额
-		total_raised: Balance,
+		pub total_raised: Balance,
 		/// 截止日期(block number)
-		end_block: BlockNumber,
+		pub end_block: BlockNumber,
 		/// 众筹的目标金额
-		goal_raise: Balance,
+		pub goal_raise: Balance,
 	}
 
 	/// pallet config trait, 所有的类型和常量`constant`在这里配置
@@ -126,7 +126,7 @@ pub mod pallet {
 		/// 基金未失效
 		FundNotInvalid,
 		/// 筹集失败
-		UnsuccessFund,
+		UnsuccessfulFund,
 	}
 
 	// 调度函数
@@ -185,7 +185,7 @@ pub mod pallet {
 			// 判断捐赠金额达标
 			ensure!(value >= T::MinContribution::get(), Error::<T>::ContributeTooSmall);
 			// 获取基金信息
-			let fund_info = Funds::<T>::get(fund_id).ok_or(Error::<T>::FundNotFound)?;
+			let mut fund_info = Funds::<T>::get(fund_id).ok_or(Error::<T>::FundNotFound)?;
 			// 确保基金尚未结束
 			let now_block = frame_system::Pallet::<T>::block_number();
 			ensure!(fund_info.end_block >= now_block, Error::<T>::FundIsEnd);
@@ -197,7 +197,7 @@ pub mod pallet {
 				ExistenceRequirement::AllowDeath,
 			)?;
 			// 更新基金信息
-			fund_info.total_raised.saturating_add(value);
+			fund_info.total_raised = fund_info.total_raised.saturating_add(value);
 			Funds::<T>::insert(fund_id, &fund_info);
 			// 更新捐赠者的捐赠金额
 			let balance = Self::contribute_get(fund_id, &who);
@@ -278,7 +278,7 @@ pub mod pallet {
 			let now_block = frame_system::Pallet::<T>::block_number();
 			ensure!(now_block >= fund_info.end_block, Error::<T>::FundNotEnd);
 			// 确保基金众筹成功
-			ensure!(fund_info.total_raised >= fund_info.goal_raise, Error::<T>::UnsuccessFund);
+			ensure!(fund_info.total_raised >= fund_info.goal_raise, Error::<T>::UnsuccessfulFund);
 			let fund_account = Self::get_fund_account_id(fund_id);
 			// 受益者分配捐赠的基金
 			T::Currency::resolve_creating(

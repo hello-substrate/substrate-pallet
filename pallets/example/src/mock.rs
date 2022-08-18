@@ -93,7 +93,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 }
 
 // 跳转到指定块 先进后出执行顺序
-fn run_to_block(n: u64) {
+pub fn run_to_block(n: u64) {
 	while System::block_number() < n {
 		ExampleModule::on_finalize(System::block_number());
 		Balances::on_finalize(System::block_number());
