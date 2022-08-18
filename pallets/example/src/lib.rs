@@ -98,11 +98,11 @@ pub mod pallet {
 		Created(FundID, T::BlockNumber),
 		/// 捐赠
 		Contributed(FundID, T::AccountId, BalanceOf<T>, T::BlockNumber),
-		/// 提现
+		/// 提取
 		Withdrew(FundID, T::AccountId, BalanceOf<T>, T::BlockNumber),
 		// 清理过期的基金
 		Dissolved(FundID, T::AccountId, T::BlockNumber),
-		// 分发基金奖励
+		// 分配基金奖励
 		Dispensed(FundID, T::AccountId, T::BlockNumber),
 	}
 
@@ -208,14 +208,14 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// 基金捐赠者提现
+		/// 基金捐赠者提取
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn withdraw(origin: OriginFor<T>, fund_id: FundID) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			// 确保基金未结束
 			let fund_info = Funds::<T>::get(fund_id).ok_or(Error::<T>::FundNotFound)?;
 			let now_block = frame_system::Pallet::<T>::block_number();
-			ensure!(fund_info.end_block < now_block, Error::<T>::FundNotEnd);
+			ensure!(now_block > fund_info.end_block, Error::<T>::FundNotEnd);
 			// 确保捐赠的金额大于0
 			let balance = Self::contribute_get(fund_id, &who);
 			ensure!(balance > Zero::zero(), Error::<T>::NoContribute);
@@ -268,8 +268,8 @@ pub mod pallet {
 		}
 
 		/// 基金成功筹集.
-		/// 分发捐赠的基金给受益者.
-		/// 分发押金奖励给调用者清理众筹存储空间
+		/// 分配捐赠的基金给受益者.
+		/// 分配押金奖励给调用者清理众筹存储空间
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn dispense(origin: OriginFor<T>, fund_id: FundID) -> DispatchResult {
 			let caller = ensure_signed(origin)?;
