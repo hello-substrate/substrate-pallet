@@ -8,13 +8,32 @@ pub use pallet::*;
 #[cfg(test)]
 mod mock;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+
 #[cfg(test)]
 mod tests;
+
+use frame_support::{traits::Currency, PalletId};
+
+// 类型别名与结构体声明处
+/// pallet identifier
+const PALLET_ID: PalletId = PalletId(*b"ex/cfund");
+
+/// 基金ID
+pub type FundID = u32;
+/// 账户ID
+type AccountIDOf<T> = <T as frame_system::Config>::AccountId;
+/// 余额
+type BalanceOf<T> = <<T as Config>::Currency as Currency<AccountIDOf<T>>>::Balance;
+/// 基金信息
+type FundInfoOf<T> =
+	FundInfo<AccountIDOf<T>, BalanceOf<T>, <T as frame_system::Config>::BlockNumber>;
 
 /// pallet逻辑的定义, 在`runtime/src/lib.rs`通过`construct_runtime`聚合
 #[frame_support::pallet]
 pub mod pallet {
-	use super::*;
+	use crate::{AccountIDOf, BalanceOf, FundID, FundInfoOf, PALLET_ID};
 	use frame_support::{
 		ensure,
 		inherent::Vec,
@@ -22,25 +41,10 @@ pub mod pallet {
 		sp_runtime::traits::Zero,
 		storage::child,
 		traits::{Currency, ExistenceRequirement, ReservableCurrency, WithdrawReasons},
-		PalletId,
 	};
 	use frame_system::{ensure_signed, pallet_prelude::*};
 	use sp_core::Hasher;
 	use sp_runtime::traits::{AccountIdConversion, Saturating};
-
-	// 类型别名与结构体声明处
-	/// pallet identifier
-	const PALLET_ID: PalletId = PalletId(*b"ex/cfund");
-
-	/// 基金ID
-	type FundID = u32;
-	/// 账户ID
-	type AccountIDOf<T> = <T as frame_system::Config>::AccountId;
-	/// 余额
-	type BalanceOf<T> = <<T as Config>::Currency as Currency<AccountIDOf<T>>>::Balance;
-	/// 基金信息
-	type FundInfoOf<T> =
-		FundInfo<AccountIDOf<T>, BalanceOf<T>, <T as frame_system::Config>::BlockNumber>;
 
 	/// 基金信息
 	#[derive(Clone, Encode, Decode, Eq, PartialEq, Default, TypeInfo, MaxEncodedLen)]
@@ -156,6 +160,7 @@ pub mod pallet {
 			// 基金 id 自增1
 			let fund_id = FundCount::<T>::get();
 			let fund_id = fund_id.checked_add(1).ok_or(Error::<T>::FundCountOverflow)?;
+			FundCount::<T>::put(fund_id);
 			// 创建账户不需要支付手续费,不使用`transfer`
 			T::Currency::resolve_creating(&Self::get_fund_account_id(fund_id), imbalance);
 			// 基金信息入库

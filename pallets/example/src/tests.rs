@@ -21,7 +21,7 @@ fn create() {
 		// 创建一个基金
 		assert_ok!(ExampleModule::create_fund(Origin::signed(1), 2, 1000, 9));
 		// 基金总数是否增加
-		assert_eq!(ExampleModule::get_fund_count(), 0);
+		assert_eq!(ExampleModule::get_fund_count(), 1);
 		// 基金信息是否一致
 		let fund_info = FundInfo {
 			beneficiary_account_id: 2,
