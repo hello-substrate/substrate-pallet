@@ -8,32 +8,25 @@ use frame_system::{EventRecord, Pallet as System, RawOrigin};
 use sp_runtime::traits::{Bounded, One};
 
 /* https://docs.substrate.io/reference/how-to-guides/weights/add-benchmarks/
+mkdir .maintain
+#此处的substrate同官方的repo仓库
+cp ../substrate/.maintain/frame-weight-template.hbs ./.maintain
+./target/release/node-template benchmark pallet --help
+
 // 模拟运行时验证 `pallet-example` 生成的基准单元测试
 cargo test --package pallet-example --features runtime-benchmarks
 cargo build --release --features runtime-benchmarks
-mkdir .maintain && cd .maintain
-#此处的substrate同官方的repo仓库
-cp ../../substrate/.maintain/frame-weight-template.hbs .
-./target/release/node-template benchmark pallet --help
 
-./target/release/node-template benchmark pallet \
+cargo build --release --features runtime-benchmarks && ./target/release/node-template benchmark pallet \
   --chain=dev \
   --execution=wasm \
   --wasm-execution=compiled \
   --pallet=pallet_example \
   --extrinsic="*" \
-  --steps=100
+  --steps=100 \
   --repeat=10 \
   --template=./.maintain/frame-weight-template.hbs \
   --output=./pallets/example/src/weights.rs
-
-./target/release/node-template benchmark pallet \
---chain dev \
---pallet pallet_example \
---extrinsic '*' \
---steps 20 \
---repeat 10 \
---output pallets/example/src/weights.rs
 
 */
 
@@ -67,7 +60,7 @@ benchmarks! {
 	let caller: T::AccountId = whitelisted_caller();
 	let beneficiary_account_id: T::AccountId = frame_benchmarking::account("beneficiary_account_id",0,0);
 	let goal_raise:BalanceOf<T>= 1000u32.into();
-	let end_block:T::BlockNumber= 9u32.into();
+	let end_block = 9u32;
 	// 给账户打钱
 	T::Currency::make_free_balance_be(&caller, BalanceOf::<T>::max_value());
 	// run_to_block::<T>(1u32.into());
@@ -76,7 +69,7 @@ benchmarks! {
 	// BalanceOf<T> = 2u32.into()
   }: {
 	 /* 2.调用调度函数 */
-		Example::<T>::create_fund(RawOrigin::Signed(caller).into(),beneficiary_account_id,goal_raise,end_block)?;
+		Example::<T>::create_fund(RawOrigin::Signed(caller).into(),beneficiary_account_id,goal_raise,end_block.into())?;
 	}
   verify {
 	 /* 3.进行验证(可选) */

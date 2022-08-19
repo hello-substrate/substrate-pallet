@@ -139,7 +139,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// 创建一个基金
-		#[pallet::weight(T::WeightInfo::create_fund(0))]
+		#[pallet::weight(T::WeightInfo::create_fund())]
 		pub fn create_fund(
 			origin: OriginFor<T>,
 			beneficiary_account_id: AccountIDOf<T>,
