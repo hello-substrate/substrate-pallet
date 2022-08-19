@@ -44,6 +44,7 @@ pub mod pallet {
 		traits::{Currency, ExistenceRequirement, ReservableCurrency, WithdrawReasons},
 	};
 	use frame_system::{ensure_signed, pallet_prelude::*};
+	use log::info;
 	use sp_core::Hasher;
 	use sp_runtime::traits::{AccountIdConversion, Saturating};
 
@@ -181,7 +182,7 @@ pub mod pallet {
 			// Return a successful DispatchResultWithPostInfo
 			Ok(())
 		}
-		/// 捐赠基金
+		/// 捐赠基金,账户金额低于500无法成功
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn contribute(
 			origin: OriginFor<T>,
@@ -189,6 +190,7 @@ pub mod pallet {
 			value: BalanceOf<T>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+			info!("contribute: {:?} {:?}", fund_id, value);
 			// 判断捐赠金额达标
 			ensure!(value >= T::MinContribution::get(), Error::<T>::ContributeTooSmall);
 			// 获取基金信息
@@ -274,7 +276,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// 基金成功筹集.
+		/// 基金成功筹集后分配
 		/// 分配捐赠的基金给受益者.
 		/// 分配押金奖励给调用者清理众筹存储空间
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
