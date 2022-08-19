@@ -5,14 +5,15 @@
 /// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
 
-#[cfg(test)]
-mod mock;
-
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
-
+#[cfg(test)]
+mod mock;
 #[cfg(test)]
 mod tests;
+// weights
+pub mod weights;
+pub use weights::*;
 
 use frame_support::{traits::Currency, PalletId};
 
@@ -33,7 +34,7 @@ type FundInfoOf<T> =
 /// pallet逻辑的定义, 在`runtime/src/lib.rs`通过`construct_runtime`聚合
 #[frame_support::pallet]
 pub mod pallet {
-	use crate::{AccountIDOf, BalanceOf, FundID, FundInfoOf, PALLET_ID};
+	use super::*;
 	use frame_support::{
 		ensure,
 		inherent::Vec,
@@ -76,6 +77,7 @@ pub mod pallet {
 		type MinContribution: Get<BalanceOf<Self>>;
 		/// 众筹失败后可清理的时间限制(以块为单位),在这之前可以提前基金,超过时间限制则会失去
 		type ExpirePeriod: Get<Self::BlockNumber>;
+		type WeightInfo: WeightInfo;
 	}
 
 	// pallet 类型的简单声明。它是我们用来实现traits和method的占位符。
@@ -137,7 +139,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// 创建一个基金
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		#[pallet::weight(T::WeightInfo::create_fund(0))]
 		pub fn create_fund(
 			origin: OriginFor<T>,
 			beneficiary_account_id: AccountIDOf<T>,

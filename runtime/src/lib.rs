@@ -282,6 +282,7 @@ impl pallet_example::Config for Runtime {
 	type SubmitterDeposit = SubmitterDeposit;
 	type MinContribution = MinContribution;
 	type ExpirePeriod = ExpirePeriod;
+	type WeightInfo = pallet_example::weights::SubstrateWeight<Runtime>;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

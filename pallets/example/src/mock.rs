@@ -77,6 +77,7 @@ impl pallet_example::Config for Test {
 	type SubmitterDeposit = SubmitterDeposit;
 	type MinContribution = MinContribution;
 	type ExpirePeriod = ExpirePeriod;
+	type WeightInfo = ();
 }
 
 // 根据我们想要的模型构建一个创世存储键值存储
