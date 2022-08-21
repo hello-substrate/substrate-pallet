@@ -1,235 +1,130 @@
 # Substrate Node Template
+- 使用一组有权力(创建与完成块)的的私人验证器启动一个小型的独立区块链网络。
+> 基板节点模板使用权威证明共识模型，也称为权威回合或Aura共识。Aura共识协议将块生产限制在授权帐户的轮换列表。授权帐户（授权）以循环方式创建块，通常被认为是网络中值得信赖的参与者。
 
-[![Try on playground](https://img.shields.io/badge/Playground-Node_Template-brightgreen?logo=Parity%20Substrate)](https://docs.substrate.io/playground/) [![Matrix](https://img.shields.io/matrix/substrate-technical:matrix.org)](https://matrix.to/#/#substrate-technical:matrix.org)
+## 生成随机短语于密钥
+1. `subkey generate --scheme Sr25519 --password-interactive`
+  1. 密码`1`
+    ```
+    Secret phrase:     mimic wrong assist hybrid water gorilla dwarf flight polar round sure deal
+    Network ID:        substrate
+    Secret seed:       0x41990fbfa6e9bcf6d58c557f8740e1e3718ad5bacd74383caae4b71b6689ffb1
+    Public key (hex):  0xd8bef00f3b253b107558e223a0649c9d10572a5b68aad818882f9fae3ff71b23
+    Account ID:        0xd8bef00f3b253b107558e223a0649c9d10572a5b68aad818882f9fae3ff71b23
+    Public key (SS58): 5GxtvMBrZ9qRGqj9rm4HQtZ8ZTJNAUZf78hyoiAzGEEFawEQ
+    SS58 Address:      5GxtvMBrZ9qRGqj9rm4HQtZ8ZTJNAUZf78hyoiAzGEEFawEQ
+    ```
+  2. 使用aura生成块 公钥: `5GxtvMBrZ9qRGqj9rm4HQtZ8ZTJNAUZf78hyoiAzGEEFawEQ`
+  3. 使用Ed25519签名方案导出密钥
+      ```
+      subkey inspect --password-interactive --scheme Ed25519 "mimic wrong assist hybrid water gorilla dwarf flight polar round sure deal"
 
-A fresh FRAME-based [Substrate](https://www.substrate.io/) node, ready for hacking :rocket:
+      Secret phrase:     mimic wrong assist hybrid water gorilla dwarf flight polar round sure deal
+      Network ID:        substrate
+      Secret seed:       0x41990fbfa6e9bcf6d58c557f8740e1e3718ad5bacd74383caae4b71b6689ffb1
+      Public key (hex):  0x61460dcbb811886073e95bf626fe96b4aa2f0e3cfbdbd94f16d648a09237fb6d
+      Account ID:        0x61460dcbb811886073e95bf626fe96b4aa2f0e3cfbdbd94f16d648a09237fb6d
+      Public key (SS58): 5EGFK4vkkFKPzhSpzArGSnT18184kgx3yHtKQ7HJoKvvxbeE
+      SS58 Address:      5EGFK4vkkFKPzhSpzArGSnT18184kgx3yHtKQ7HJoKvvxbeE
+      ```
+  4. 使用grandpa完成一个节点的块,公钥: `5EGFK4vkkFKPzhSpzArGSnT18184kgx3yHtKQ7HJoKvvxbeE`
+2. 第二组
+    ```
+    Secret phrase:     loop extend alien air tube target bachelor range test winter filter glimpse
+    Network ID:        substrate
+    Secret seed:       0x03549cd7636a352132bcd6c37edce4571eebce02df197f365ec8b31b66a6e8a3
+    Public key (hex):  0x68f4120af77504e112d9a32fd6110c782f92a6edeb993d8bfa4840fd4423572c
+    Account ID:        0x68f4120af77504e112d9a32fd6110c782f92a6edeb993d8bfa4840fd4423572c
+    Public key (SS58): 5ESKLkCyVU9kr652zFR5duDQkDkwLe9RGCa61sHAd3nR7ZMK
+    SS58 Address:      5ESKLkCyVU9kr652zFR5duDQkDkwLe9RGCa61sHAd3nR7ZMK
 
-## Getting Started
 
-Follow the steps below to get started with the Node Template, or get it up and running right from
-your browser in just a few clicks using
-the [Substrate Playground](https://docs.substrate.io/playground/) :hammer_and_wrench:
+    subkey inspect --password-interactive --scheme Ed25519 "loop extend alien air tube target bachelor range test winter filter glimpse"
 
-### Using Nix
+    Secret phrase:     loop extend alien air tube target bachelor range test winter filter glimpse
+    Network ID:        substrate
+    Secret seed:       0x851268391285b0c3607896510dcb0163f603e54b468bfa52b9ffd7b2f9154f6e
+    Public key (hex):  0x4b8c7f8acc9b731b60d842a2854eca60fd61fdcd8c2b2e879f5eaeefa32ea655
+    Account ID:        0x4b8c7f8acc9b731b60d842a2854eca60fd61fdcd8c2b2e879f5eaeefa32ea655
+    Public key (SS58): 5DmmBhGPbxU8gnsGYbkVNkR15xFhTfjfdoB2t7zpGWxZco2c
+    SS58 Address:      5DmmBhGPbxU8gnsGYbkVNkR15xFhTfjfdoB2t7zpGWxZco2c
+    ```
 
-Install [nix](https://nixos.org/) and optionally [direnv](https://github.com/direnv/direnv) and
-[lorri](https://github.com/nix-community/lorri) for a fully plug and play experience for setting up
-the development environment. To get all the correct dependencies activate direnv `direnv allow` and
-lorri `lorri shell`.
-
-### Rust Setup
-
-First, complete the [basic Rust setup instructions](./docs/rust-setup.md).
-
-### Run
-
-Use Rust's native `cargo` command to build and launch the template node:
-
-```sh
-cargo run --release -- --dev
+## 创建链规范
+```
+./target/release/node-template build-spec --disable-default-bootnode --chain local > customSpec.json
+```
+修改 `name` 字段
+1. 修改aura字段指定有权创建块的节点。添加Sr25519 SS58地址密钥
 ```
 
-### Build
+```
+2. 修改grandpa字段以指定有权完成块的节点。添加Ed25519 SS58地址密钥
+第一个值是地址。第二个值用于支持加权投票。在本例中，每个验证器的权重为1票
+```
+```
+3. 请务必为每个验证器使用唯一的密钥。如果两个验证器具有相同的密钥，它们会产生冲突的块。
 
-The `cargo run` command will perform an initial build. Use the following command to build the node
-without launching it:
+## 转换原始格式
+`./target/release/node-template build-spec --chain=customSpec.json --raw --disable-default-bootnode > customSpecRaw.json`
 
-```sh
-cargo build --release
+## 启动
+1. aura密钥插入 keystore
+```
+./target/release/node-template key insert --base-path /tmp/node01 \
+  --chain customSpecRaw.json \
+  --scheme Sr25519 \
+  --suri "mimic wrong assist hybrid water gorilla dwarf flight polar round sure deal" \
+  --password-interactive \
+  --key-type aura
+```
+2. grandpa密钥插入 keystore
+```
+./target/release/node-template key insert \
+  --base-path /tmp/node01 \
+  --chain customSpecRaw.json \
+  --scheme Ed25519 \
+  --suri "mimic wrong assist hybrid water gorilla dwarf flight polar round sure deal" \
+  --password-interactive \
+  --key-type gran
+```
+3. 查看 `ls /tmp/node01/chains/local_testnet/keystore`
+生成类似
+```
+617572611441ddcb22724420b87ee295c6d47c5adff0ce598c87d3c749b776ba9a647f04
+6772616e1441ddcb22724420b87ee295c6d47c5adff0ce598c87d3c749b776ba9a647f04
+```
+4. 启动
+```
+./target/release/node-template \
+  --base-path /tmp/node01 \
+  --chain ./customSpecRaw.json \
+  --port 30333 \
+  --ws-port 9945 \
+  --rpc-port 9933 \
+  --telemetry-url "wss://telemetry.polkadot.io/submit/ 0" \
+  --validator \
+  --rpc-methods Unsafe \
+  --name MyNode01 \
+  --password-interactive
 ```
 
-### Embedded Docs
-
-Once the project has been built, the following command can be used to explore all parameters and
-subcommands:
-
-```sh
-./target/release/node-template -h
+## 其他节点加入
+1. aura密钥插入 keystore(同上)
+2. grandpa密钥插入 keystore(同上)
+3. 启动
+```
+./target/release/node-template \
+  --base-path /tmp/node02 \
+  --chain ./customSpecRaw.json \
+  --port 30334 \
+  --ws-port 9946 \
+  --rpc-port 9934 \
+  --telemetry-url "wss://telemetry.polkadot.io/submit/ 0" \
+  --validator \
+  --rpc-methods Unsafe \
+  --name MyNode02 \
+  --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/12D3KooWLmrYDLoNTyTYtRdDyZLWDe1paxzxTw5RgjmHLfzW96SX \
+  --password-interactive
 ```
 
-## Run
-
-The provided `cargo run` command will launch a temporary node and its state will be discarded after
-you terminate the process. After the project has been built, there are other ways to launch the
-node.
-
-### Single-Node Development Chain
-
-This command will start the single-node development chain with non-persistent state:
-
-```bash
-./target/release/node-template --dev
-```
-
-Purge the development chain's state:
-
-```bash
-./target/release/node-template purge-chain --dev
-```
-
-Start the development chain with detailed logging:
-
-```bash
-RUST_BACKTRACE=1 ./target/release/node-template -ldebug --dev
-```
-
-> Development chain means that the state of our chain will be in a tmp folder while the nodes are
-> running. Also, **alice** account will be authority and sudo account as declared in the
-> [genesis state](https://github.com/substrate-developer-hub/substrate-node-template/blob/main/node/src/chain_spec.rs#L49).
-> At the same time the following accounts will be pre-funded:
-> - Alice
-> - Bob
-> - Alice//stash
-> - Bob//stash
-
-In case of being interested in maintaining the chain' state between runs a base path must be added
-so the db can be stored in the provided folder instead of a temporal one. We could use this folder
-to store different chain databases, as a different folder will be created per different chain that
-is ran. The following commands shows how to use a newly created folder as our db base path.
-
-```bash
-// Create a folder to use as the db base path
-$ mkdir my-chain-state
-
-// Use of that folder to store the chain state
-$ ./target/release/node-template --dev --base-path ./my-chain-state/
-
-// Check the folder structure created inside the base path after running the chain
-$ ls ./my-chain-state
-chains
-$ ls ./my-chain-state/chains/
-dev
-$ ls ./my-chain-state/chains/dev
-db keystore network
-```
-
-
-### Connect with Polkadot-JS Apps Front-end
-
-Once the node template is running locally, you can connect it with **Polkadot-JS Apps** front-end
-to interact with your chain. [Click
-here](https://polkadot.js.org/apps/#/explorer?rpc=ws://localhost:9944) connecting the Apps to your
-local node template.
-
-### Multi-Node Local Testnet
-
-If you want to see the multi-node consensus algorithm in action, refer to our
-[Start a Private Network tutorial](https://docs.substrate.io/tutorials/v3/private-network).
-
-## Template Structure
-
-A Substrate project such as this consists of a number of components that are spread across a few
-directories.
-
-### Node
-
-A blockchain node is an application that allows users to participate in a blockchain network.
-Substrate-based blockchain nodes expose a number of capabilities:
-
-- Networking: Substrate nodes use the [`libp2p`](https://libp2p.io/) networking stack to allow the
-  nodes in the network to communicate with one another.
-- Consensus: Blockchains must have a way to come to
-  [consensus](https://docs.substrate.io/v3/advanced/consensus) on the state of the
-  network. Substrate makes it possible to supply custom consensus engines and also ships with
-  several consensus mechanisms that have been built on top of
-  [Web3 Foundation research](https://research.web3.foundation/en/latest/polkadot/NPoS/index.html).
-- RPC Server: A remote procedure call (RPC) server is used to interact with Substrate nodes.
-
-There are several files in the `node` directory - take special note of the following:
-
-- [`chain_spec.rs`](./node/src/chain_spec.rs): A
-  [chain specification](https://docs.substrate.io/v3/runtime/chain-specs) is a
-  source code file that defines a Substrate chain's initial (genesis) state. Chain specifications
-  are useful for development and testing, and critical when architecting the launch of a
-  production chain. Take note of the `development_config` and `testnet_genesis` functions, which
-  are used to define the genesis state for the local development chain configuration. These
-  functions identify some
-  [well-known accounts](https://docs.substrate.io/v3/tools/subkey#well-known-keys)
-  and use them to configure the blockchain's initial state.
-- [`service.rs`](./node/src/service.rs): This file defines the node implementation. Take note of
-  the libraries that this file imports and the names of the functions it invokes. In particular,
-  there are references to consensus-related topics, such as the
-  [longest chain rule](https://docs.substrate.io/v3/advanced/consensus#longest-chain-rule),
-  the [Aura](https://docs.substrate.io/v3/advanced/consensus#aura) block authoring
-  mechanism and the
-  [GRANDPA](https://docs.substrate.io/v3/advanced/consensus#grandpa) finality
-  gadget.
-
-After the node has been [built](#build), refer to the embedded documentation to learn more about the
-capabilities and configuration parameters that it exposes:
-
-```shell
-./target/release/node-template --help
-```
-
-### Runtime
-
-In Substrate, the terms
-"[runtime](https://docs.substrate.io/v3/getting-started/glossary#runtime)" and
-"[state transition function](https://docs.substrate.io/v3/getting-started/glossary#state-transition-function-stf)"
-are analogous - they refer to the core logic of the blockchain that is responsible for validating
-blocks and executing the state changes they define. The Substrate project in this repository uses
-the [FRAME](https://docs.substrate.io/v3/runtime/frame) framework to construct a
-blockchain runtime. FRAME allows runtime developers to declare domain-specific logic in modules
-called "pallets". At the heart of FRAME is a helpful
-[macro language](https://docs.substrate.io/v3/runtime/macros) that makes it easy to
-create pallets and flexibly compose them to create blockchains that can address
-[a variety of needs](https://www.substrate.io/substrate-users/).
-
-Review the [FRAME runtime implementation](./runtime/src/lib.rs) included in this template and note
-the following:
-
-- This file configures several pallets to include in the runtime. Each pallet configuration is
-  defined by a code block that begins with `impl $PALLET_NAME::Config for Runtime`.
-- The pallets are composed into a single runtime by way of the
-  [`construct_runtime!`](https://crates.parity.io/frame_support/macro.construct_runtime.html)
-  macro, which is part of the core
-  [FRAME Support](https://docs.substrate.io/v3/runtime/frame#support-crate)
-  library.
-
-### Pallets
-
-The runtime in this project is constructed using many FRAME pallets that ship with the
-[core Substrate repository](https://github.com/paritytech/substrate/tree/master/frame) and a
-template pallet that is [defined in the `pallets`](./pallets/template/src/lib.rs) directory.
-
-A FRAME pallet is compromised of a number of blockchain primitives:
-
-- Storage: FRAME defines a rich set of powerful
-  [storage abstractions](https://docs.substrate.io/v3/runtime/storage) that makes
-  it easy to use Substrate's efficient key-value database to manage the evolving state of a
-  blockchain.
-- Dispatchables: FRAME pallets define special types of functions that can be invoked (dispatched)
-  from outside of the runtime in order to update its state.
-- Events: Substrate uses [events and errors](https://docs.substrate.io/v3/runtime/events-and-errors)
-  to notify users of important changes in the runtime.
-- Errors: When a dispatchable fails, it returns an error.
-- Config: The `Config` configuration interface is used to define the types and parameters upon
-  which a FRAME pallet depends.
-
-### Run in Docker
-
-First, install [Docker](https://docs.docker.com/get-docker/) and
-[Docker Compose](https://docs.docker.com/compose/install/).
-
-Then run the following command to start a single node development chain.
-
-```bash
-./scripts/docker_run.sh
-```
-
-This command will firstly compile your code, and then start a local development network. You can
-also replace the default command
-(`cargo build --release && ./target/release/node-template --dev --ws-external`)
-by appending your own. A few useful ones are as follow.
-
-```bash
-# Run Substrate node without re-compiling
-./scripts/docker_run.sh ./target/release/node-template --dev --ws-external
-
-# Purge the local dev chain
-./scripts/docker_run.sh ./target/release/node-template purge-chain --dev
-
-# Check whether the code is compilable
-./scripts/docker_run.sh cargo check
-```
