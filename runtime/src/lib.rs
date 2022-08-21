@@ -6,6 +6,7 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+use frame_system::EnsureRoot;
 use pallet_grandpa::{
 	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
 };
@@ -270,10 +271,27 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
+parameter_types! {
+ pub const MaxWellKnownNodes: u32 = 8;
+ pub const MaxPeerIdLength: u32 = 128;
+}
+
+impl pallet_node_authorization::Config for Runtime {
+ type Event = Event;
+ type MaxWellKnownNodes = MaxWellKnownNodes;
+ type MaxPeerIdLength = MaxPeerIdLength;
+ type AddOrigin = EnsureRoot<AccountId>;
+ type RemoveOrigin = EnsureRoot<AccountId>;
+ type SwapOrigin = EnsureRoot<AccountId>;
+ type ResetOrigin = EnsureRoot<AccountId>;
+ type WeightInfo = ();
+}
+
 // local
 impl pallet_example::Config for Runtime {
 	type Event = Event;
 }
+
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -294,6 +312,7 @@ construct_runtime!(
 		TemplateModule: pallet_template,
 		// local
 		ExampleModule: pallet_example,
+		NodeAuthorization: pallet_node_authorization::{Pallet, Call, Storage, Event<T>, Config<T>},
 	}
 );
 

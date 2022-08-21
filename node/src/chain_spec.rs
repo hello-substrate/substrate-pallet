@@ -2,12 +2,13 @@ use node_template_runtime::{
 	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig, Signature, SudoConfig,
 	SystemConfig, WASM_BINARY,
 };
+use node_template_runtime::NodeAuthorizationConfig;
 use sc_service::ChainType;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{sr25519, Pair, Public};
 use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::traits::{IdentifyAccount, Verify};
-
+use sp_core::OpaquePeerId;
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
@@ -152,5 +153,17 @@ fn testnet_genesis(
 			key: Some(root_key),
 		},
 		transaction_payment: Default::default(),
+		node_authorization: NodeAuthorizationConfig {
+			nodes: vec![
+				(
+					OpaquePeerId(bs58::decode("12D3KooWNkXzBATF2q6a8uDvEfGZGH9bKjHSBWcrThH1AJh2mCWy").into_vec().unwrap()),
+					endowed_accounts[0].clone()
+				),
+				(
+					OpaquePeerId(bs58::decode("12D3KooW9ycrz3ApbHVdfmP8LSHnF8sLzmzrix9Z9pXTHU5wYDLT").into_vec().unwrap()),
+					endowed_accounts[1].clone()
+				),
+			],
+		},
 	}
 }
