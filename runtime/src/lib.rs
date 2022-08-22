@@ -270,7 +270,7 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
-// local
+// local or new pallet
 impl pallet_example::Config for Runtime {
 	type Event = Event;
 }
@@ -292,7 +292,7 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
-		// local
+		// local or new pallet
 		ExampleModule: pallet_example,
 	}
 );
