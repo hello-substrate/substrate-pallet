@@ -63,7 +63,7 @@
 可修改 `name` 字段
 
 - 修改`sudo key`账户
-
+  https://www.shawntabrizi.com/substrate/the-sudo-story-in-substrate/
 ```
 "sudo": {
     "key": "5GxtvMBrZ9qRGqj9rm4HQtZ8ZTJNAUZf78hyoiAzGEEFawEQ"
