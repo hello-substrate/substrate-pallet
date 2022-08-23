@@ -6,6 +6,7 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+use codec::Encode;
 use pallet_grandpa::{
 	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
 };
@@ -35,10 +36,12 @@ pub use frame_support::{
 	},
 	StorageValue,
 };
+use frame_system::offchain::AppCrypto;
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::CurrencyAdapter;
+use sp_runtime::traits::Extrinsic;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
@@ -273,6 +276,63 @@ impl pallet_template::Config for Runtime {
 // local or new pallet
 impl pallet_example::Config for Runtime {
 	type Event = Event;
+	type AuthorityId = pallet_example::crypto::TestAuthId;
+}
+// 实现 pallet_example 的 CreateSignedTransaction SigningTypes SendTransactionTypes
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
+where
+	Call: From<LocalCall>,
+{
+	// 在 pallet/hooks/offchain_worker/send_signed_transaction 函数触发
+	fn create_transaction<C: AppCrypto<Self::Public, Self::Signature>>(
+		call: Self::OverarchingCall,
+		public: Self::Public,
+		account: Self::AccountId,
+		nonce: Self::Index,
+	) -> Option<(Self::OverarchingCall, <Self::Extrinsic as ExtrinsicT>::SignaturePayload)> {
+		let tip = 0;
+		// take the biggest period possible.
+		let period = BlockHashCount::get() as u64;
+
+		let current_block = System::block_number()
+			.saturated_into::<u64>()
+			// `System::block_number` 初始化是 n+1 所以要减去1
+			.saturating_sub(1);
+
+		let extra = (
+			frame_system::CheckNonZeroSender::<Runtime>::new(),
+			frame_system::CheckSpecVersion::<Runtime>::new(),
+			frame_system::CheckTxVersion::<Runtime>::new(),
+			frame_system::CheckGenesis::<Runtime>::new(),
+			frame_system::CheckEra::<Runtime>::from(generic::Era::mortal(period, current_block)),
+			frame_system::CheckNonce::<Runtime>::from(nonce),
+			frame_system::CheckWeight::<Runtime>::new(),
+			pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+		);
+		let raw_payload = SignedPayload::new(call, extra)
+			.map_err(|e| {
+				log::warn!("Unable to create signed payload: {:?}", e);
+			})
+			.ok()?;
+		let signature = raw_payload.using_encoded(|payload| C::sign(payload, public))?;
+		// let address = <Self as frame_system::Config>::Lookup::unlookup(account);
+		let address = sp_runtime::MultiAddress::Id(account);
+		let (call, extra, _) = raw_payload.deconstruct();
+		// 返回 链上 call, 进行签名的账户/地址,签名本身,和 extra
+		Some((call, (address, signature.into(), extra)))
+	}
+}
+impl frame_system::offchain::SigningTypes for Runtime {
+	type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+	type Signature = Signature;
+}
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
+where
+	Call: From<C>,
+{
+	type Extrinsic = UncheckedExtrinsic;
+	type OverarchingCall = Call;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
