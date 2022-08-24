@@ -25,6 +25,7 @@ use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
 // A few exports that help ease life for downstream crates.
+use frame_support::log;
 pub use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{
@@ -274,11 +275,16 @@ impl pallet_template::Config for Runtime {
 }
 
 // local or new pallet
+parameter_types! {
+	pub const MaxNumbers:u32 = 10;
+}
 impl pallet_example::Config for Runtime {
 	type Event = Event;
 	type AuthorityId = pallet_example::crypto::TestAuthId;
+	type MaxNumbers = MaxNumbers;
 }
 // 实现 pallet_example 的 CreateSignedTransaction SigningTypes SendTransactionTypes
+use sp_runtime::SaturatedConversion; //saturated_into 操作依赖
 impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
 where
 	Call: From<LocalCall>,
@@ -289,7 +295,7 @@ where
 		public: Self::Public,
 		account: Self::AccountId,
 		nonce: Self::Index,
-	) -> Option<(Self::OverarchingCall, <Self::Extrinsic as ExtrinsicT>::SignaturePayload)> {
+	) -> Option<(Self::OverarchingCall, <Self::Extrinsic as Extrinsic>::SignaturePayload)> {
 		let tip = 0;
 		// take the biggest period possible.
 		let period = BlockHashCount::get() as u64;

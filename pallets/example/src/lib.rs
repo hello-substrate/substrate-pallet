@@ -139,17 +139,19 @@ pub mod pallet {
 
 		fn offchain_signed_tx(block_number: T::BlockNumber) -> Result<(), Error<T>> {
 			// 使用任何一个可用的密钥进行签名。
+			// all_accounts() 是所有的账户都执行一次交易 返回 Vec<(Account<T>, Result<(), ()>)>
 			let signer = Signer::<T, T::AuthorityId>::any_account();
 			// 如果有多个键，并且我们想要精确定位它，`with_filter（）`可以被链接，
 			// signer.with_filter(vec![0xf2.into(), 0xf1.into()]);
-			// 验证可用
-			info!("+++++++++++++++++++, can sign: {:?}", signer.can_sign());
 			// 将当前区块编号转换为数字并在链上提交
 			let number: u64 = block_number.try_into().unwrap_or(0);
 			// `result` is in the type of `Option<(Account<T>, Result<(), ()>)>`. It is:
 			//   - `None`: no account is available for sending transaction
 			//   - `Some((account, Err(())))`: error occured when sending the transaction
 			//   - `Some((account, Ok(())))`: transaction is successfully sent
+			// if let Some(res) = res { // 遍历已签名的 accounts 返回执行成功的 account 和结果
+			// 	return Some((account, res))
+			// }
 			// 发送链上签名的交易,最终调用已 runtime 声明的
 			// frame_system::offchain::CreateSignedTransaction::create_transaction()
 			let result = signer.send_signed_transaction(|_acct|
@@ -159,15 +161,16 @@ pub mod pallet {
 			match result {
 				Some((acc, res)) => {
 					if res.is_err() {
-						error!("failure: offchain_signed_tx: tx sent: {:?}", acc.id);
+						error!("fail call submit_number_signed: check error and offchain_signed_tx account: {:?}", acc.id);
 						return Err(Error::<T>::OffchainSignedTxError)
 					}
 					// Transaction is sent successfully
+					info!("ocw call success. account: {:?}", acc.id);
 					return Ok(())
 				},
 				None => {
 					// The case of `None`: no account is available for sending
-					error!("No local account available");
+					error!("Add a account to ocw. No local account available.");
 					Err(Error::<T>::NoLocalAcctForSignedTx)
 				},
 			}
