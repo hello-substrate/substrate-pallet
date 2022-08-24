@@ -47,7 +47,10 @@ pub mod pallet {
 		pallet_prelude::*,
 	};
 	use frame_system::{
-		offchain::{AppCrypto, CreateSignedTransaction, SendSignedTransaction, Signer},
+		offchain::{
+			AppCrypto, CreateSignedTransaction, SendSignedTransaction, SendUnsignedTransaction,
+			SignedPayload, Signer, SigningTypes, SubmitTransaction,
+		},
 		pallet_prelude::*,
 	};
 
@@ -69,6 +72,21 @@ pub mod pallet {
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
+	// ====================
+	// 可被签名的数据结构负载,需实现 SignedPayload trait
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, scale_info::TypeInfo)]
+	pub struct Payload<Public> {
+		number: u64,
+		public: Public,
+	}
+
+	impl<T: SigningTypes> frame_system::offchain::SignedPayload<T> for Payload<T::Public> {
+		fn public(&self) -> T::Public {
+			self.public.clone()
+		}
+	}
+	// ====================
+
 	#[pallet::storage]
 	#[pallet::getter(fn get_numbers)]
 	pub type Numbers<T: Config> = StorageValue<_, BoundedVec<u64, T::MaxNumbers>, ValueQuery>;
@@ -83,8 +101,10 @@ pub mod pallet {
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		NoLocalAcctForSignedTx,
+		NoLocalAcctForSigning,
 		OffchainSignedTxError,
+		OffchainUnsignedTxError,
+		OffchainUnsignedTxSignedPayloadError,
 		NumbersOverflow,
 		// 没有可执行的函数
 		NoOffchainFunc,
@@ -94,7 +114,7 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		// 链下工作者入口
 		fn offchain_worker(block_number: BlockNumberFor<T>) {
-			info!("Entering off-chain worker");
+			info!("---Entering off-chain worker");
 			// 使用 off-chain workers 的方法
 			// 1. Sending signed transaction from ocw
 			// 2. Sending unsigned transaction from ocw
@@ -103,13 +123,13 @@ pub mod pallet {
 			const TRANSACTION_TYPES: usize = 4;
 			let result = match block_number.try_into().unwrap_or(0) % TRANSACTION_TYPES {
 				1 => Self::offchain_signed_tx(block_number),
-				2 => Ok(()),
-				3 => Ok(()),
+				2 => Self::offchain_unsigned_tx(block_number),
+				3 => Self::offchain_unsigned_tx_signed_payload(block_number),
 				0 => Ok(()),
 				_ => Err(Error::<T>::NoOffchainFunc),
 			};
 			if let Err(e) = result {
-				error!("offchain_worker error: {:?}", e);
+				error!("---offchain_worker error: {:?}", e);
 			}
 		}
 	}
@@ -119,9 +139,31 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn submit_number_signed(origin: OriginFor<T>, number: u64) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			info!("submit_number_unsigned: {}", number);
+			info!("---submit_number_signed: {}", number);
 			Self::append_or_replace_number(number).map_err(|_| Error::<T>::NumbersOverflow)?;
 			Self::deposit_event(Event::NewNumber(Some(who), number));
+			Ok(())
+		}
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn submit_number_unsigned(origin: OriginFor<T>, number: u64) -> DispatchResult {
+			ensure_none(origin)?;
+			info!("---submit_number_unsigned: {}", number);
+			Self::append_or_replace_number(number).map_err(|_| Error::<T>::NumbersOverflow)?;
+			Self::deposit_event(Event::NewNumber(None, number));
+			Ok(())
+		}
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn submit_number_unsigned_with_signed_payload(
+			origin: OriginFor<T>,
+			payload: Payload<T::Public>,
+			_signature: T::Signature,
+		) -> DispatchResult {
+			ensure_none(origin)?;
+			// 不需要在此验证 已在 validate_unsigned 方法中验证了
+			let Payload { number, public } = payload;
+			info!("---submit_number_unsigned_with_signed_payload: ({}, {:?})", number, public);
+			Self::append_or_replace_number(number).map_err(|_| Error::<T>::NumbersOverflow)?;
+			Self::deposit_event(Event::NewNumber(None, number));
 			Ok(())
 		}
 	}
@@ -138,7 +180,7 @@ pub mod pallet {
 		}
 
 		fn offchain_signed_tx(block_number: T::BlockNumber) -> Result<(), Error<T>> {
-			// 使用任何一个可用的密钥进行签名。
+			// 获取任何一个可用的密钥进行签名。
 			// all_accounts() 是所有的账户都执行一次交易 返回 Vec<(Account<T>, Result<(), ()>)>
 			let signer = Signer::<T, T::AuthorityId>::any_account();
 			// 如果有多个键，并且我们想要精确定位它，`with_filter（）`可以被链接，
@@ -156,23 +198,91 @@ pub mod pallet {
 			// frame_system::offchain::CreateSignedTransaction::create_transaction()
 			let result = signer.send_signed_transaction(|_acct|
 				// This is the on-chain function
-				Call::submit_number_signed{number});
+				Call::submit_number_signed { number });
 			// 如果签名发送失败，则显示错误
 			match result {
-				Some((acc, res)) => {
-					if res.is_err() {
-						error!("fail call submit_number_signed: check error and offchain_signed_tx account: {:?}", acc.id);
-						return Err(Error::<T>::OffchainSignedTxError)
-					}
-					// Transaction is sent successfully
-					info!("ocw call success. account: {:?}", acc.id);
-					return Ok(())
-				},
+				Some((acc, res)) => res.map_err(|_| {
+					error!("---submit_number_signed fail call: check error and offchain_signed_tx account: {:?}", acc.id);
+					Error::<T>::OffchainSignedTxError
+				}),
 				None => {
 					// The case of `None`: no account is available for sending
-					error!("Add a account to ocw. No local account available.");
-					Err(Error::<T>::NoLocalAcctForSignedTx)
+					error!(
+						"submit_number_signed: Add a account to ocw. No local account available."
+					);
+					Err(Error::<T>::NoLocalAcctForSigning)
 				},
+			}
+		}
+		fn offchain_unsigned_tx(block_number: T::BlockNumber) -> Result<(), Error<T>> {
+			let number: u64 = block_number.try_into().unwrap_or(0);
+			let call = Call::submit_number_unsigned { number };
+			// `submit_unsigned_transaction` returns a type of `Result<(), ()>`
+			// 提供在链上直接提交签名和未签名交易的能力
+			SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
+				.map_err(|_| Error::<T>::OffchainUnsignedTxError)
+		}
+		// 提交一个未签名交易并带有签名负载
+		// 此操作不会向签名者账户收取交易费用
+		fn offchain_unsigned_tx_signed_payload(
+			block_number: T::BlockNumber,
+		) -> Result<(), Error<T>> {
+			// 获取签名者用来签名负载
+			let signer = Signer::<T, T::AuthorityId>::any_account();
+			let number: u64 = block_number.try_into().unwrap_or(0);
+			// `send_unsigned_transaction` is returning a type of `Option<(Account<T>, Result<(),
+			// ()>)>`.   Similar to `send_signed_transaction`, they account for:
+			//   - `None`: no account is available for sending transaction
+			//   - `Some((account, Ok(())))`: transaction is successfully sent
+			//   - `Some((account, Err(())))`: error occured when sending the transaction
+			let result = signer.send_unsigned_transaction(
+				// 准备和返回 Payload
+				|acct| Payload { number, public: acct.public.clone() },
+				|payload, signature| Call::submit_number_unsigned_with_signed_payload {
+					payload,
+					signature,
+				},
+			);
+			match result {
+				Some((_, res)) => res.map_err(|_| {
+					error!("---submit_number_unsigned_with_signed_payload fail call: check error");
+					Error::<T>::OffchainUnsignedTxSignedPayloadError
+				}),
+				None => {
+					error!("---submit_number_unsigned_with_signed_payload: Add a account to ocw. No local account available.");
+					Err(Error::<T>::NoLocalAcctForSigning)
+				},
+			}
+		}
+	}
+
+	// 默认情况下，所有未签名的交易都会在 Substrate 中被拒绝。
+	// 要使 Substrate 能够接受某些未签名的交易，
+	// 您必须为托盘实现 ValidateUnsigned trait。
+	#[pallet::validate_unsigned]
+	impl<T: Config> ValidateUnsigned for Pallet<T> {
+		type Call = Call<T>;
+		fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+			//Call冒号后面就是具体的提交未签名交易的函数，
+			//需要对此交易进行验证
+			let valid_tx = |provide| {
+				ValidTransaction::with_tag_prefix("ExampleModule")
+					.priority(TransactionPriority::MAX)
+					.and_provides([&provide]) // 添加一个 TransactionTag
+					.longevity(5) //设置事务的寿命。此处设置 5 blockNumber. 默认情况下，交易将被视为永久有效
+					.propagate(true) //设置传播标志。如果交易不打算向对等方传播，则设置为 false
+					.build()
+			};
+			match call {
+				Call::submit_number_unsigned { number: _ } =>
+					valid_tx(b"submit_number_unsigned".to_vec()),
+				Call::submit_number_unsigned_with_signed_payload { ref payload, ref signature } => {
+					if !SignedPayload::<T>::verify::<T::AuthorityId>(payload, signature.clone()) {
+						return InvalidTransaction::BadProof.into()
+					}
+					valid_tx(b"submit_number_unsigned_with_signed_payload".to_vec())
+				},
+				_ => InvalidTransaction::Call.into(),
 			}
 		}
 	}
