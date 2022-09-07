@@ -14,13 +14,40 @@ mod benchmarking;
 /// pallet逻辑的定义, 在`runtime/src/lib.rs`通过`construct_runtime`聚合
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
+	use core::fmt::Debug;
+
+	use frame_support::{
+		pallet_prelude::*,
+		traits::{Currency, ReservableCurrency},
+	};
 	use frame_system::pallet_prelude::*;
+
+	// ----------------------------------------------------------------
+	/// 定义余额类型
+	type BalanceOf<T> =
+		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+	// ----------------------------------------------------------------
 
 	/// pallet config trait, 所有的类型和常量`constant`在这里配置
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		// 自定义类型
+		type CustomType: Parameter
+			+ Member
+			+ sp_runtime::traits::AtLeast32BitUnsigned
+			+ codec::Codec
+			+ Default
+			+ Copy
+			+ MaybeSerializeDeserialize
+			+ Debug
+			+ MaxEncodedLen
+			+ TypeInfo;
+		/// 金额
+		#[pallet::constant]
+		type Amount: Get<BalanceOf<Self>>;
+		/// 可质押的货币
+		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 	}
 
 	// pallet 类型的简单声明。它是我们用来实现traits和method的占位符。

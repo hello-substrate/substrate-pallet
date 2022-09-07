@@ -1,8 +1,5 @@
 use crate as pallet_example;
-use frame_support::{
-	parameter_types,
-	traits::{ConstU16, ConstU64, OnFinalize, OnInitialize},
-};
+use frame_support::traits::{ConstU128, ConstU16, ConstU64, OnFinalize, OnInitialize};
 use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{
@@ -27,6 +24,8 @@ frame_support::construct_runtime!(
 	}
 );
 
+pub type Balance = u128;
+
 impl system::Config for Test {
 	type BaseCallFilter = frame_support::traits::Everything;
 	type BlockWeights = ();
@@ -45,7 +44,7 @@ impl system::Config for Test {
 	type BlockHashCount = ConstU64<250>;
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<u64>;
+	type AccountData = pallet_balances::AccountData<Balance>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -58,27 +57,19 @@ impl pallet_balances::Config for Test {
 	type MaxLocks = ();
 	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
-	type Balance = u64;
+	type Balance = Balance;
 	type DustRemoval = ();
 	type Event = Event;
-	type ExistentialDeposit = ConstU64<1>;
+	type ExistentialDeposit = ConstU128<1>;
 	type AccountStore = System;
 	type WeightInfo = ();
 }
 
-parameter_types! {
-	pub const SubmitterDeposit: u64 = 1;
-	pub const MinContribution: u64 = 10;
-	pub const ExpirePeriod: u64 = 5;
-}
-
 impl pallet_example::Config for Test {
 	type Event = Event;
+	type CustomType = u32;
+	type Amount = ConstU128<500>;
 	type Currency = Balances;
-	type SubmitterDeposit = SubmitterDeposit;
-	type MinContribution = MinContribution;
-	type ExpirePeriod = ExpirePeriod;
-	type WeightInfo = ();
 }
 
 // 根据我们想要的模型构建一个创世存储键值存储
@@ -100,6 +91,13 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	let ext = sp_io::TestExternalities::new(t);
 	// ext.execute_with(|| System::set_block_number(1));
 	ext
+}
+
+// 获取所有的事件
+fn events() -> Vec<Event> {
+	let evt = System::events().into_iter().map(|evt| evt.event).collect::<Vec<_>>();
+	System::reset_events();
+	evt
 }
 
 // 跳转到指定块 先进后出执行顺序
