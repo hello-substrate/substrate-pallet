@@ -1,10 +1,14 @@
 use crate as pallet_example;
-use frame_support::traits::{ConstU16, ConstU64};
+use frame_support::{
+	parameter_types,
+	traits::{ConstU16, ConstU64, OnFinalize, OnInitialize},
+};
 use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
+	BuildStorage,
 };
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
@@ -18,6 +22,7 @@ frame_support::construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		ExampleModule: pallet_example::{Pallet, Call, Storage, Event<T>},
 	}
 );
@@ -40,7 +45,7 @@ impl system::Config for Test {
 	type BlockHashCount = ConstU64<250>;
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = ();
+	type AccountData = pallet_balances::AccountData<u64>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -49,11 +54,63 @@ impl system::Config for Test {
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
-impl pallet_example::Config for Test {
+impl pallet_balances::Config for Test {
+	type MaxLocks = ();
+	type MaxReserves = ();
+	type ReserveIdentifier = [u8; 8];
+	type Balance = u64;
+	type DustRemoval = ();
 	type Event = Event;
+	type ExistentialDeposit = ConstU64<1>;
+	type AccountStore = System;
+	type WeightInfo = ();
 }
 
-// Build genesis storage according to the mock runtime.
+parameter_types! {
+	pub const SubmitterDeposit: u64 = 1;
+	pub const MinContribution: u64 = 10;
+	pub const ExpirePeriod: u64 = 5;
+}
+
+impl pallet_example::Config for Test {
+	type Event = Event;
+	type Currency = Balances;
+	type SubmitterDeposit = SubmitterDeposit;
+	type MinContribution = MinContribution;
+	type ExpirePeriod = ExpirePeriod;
+	type WeightInfo = ();
+}
+
+// 根据我们想要的模型构建一个创世存储键值存储
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+	GenesisConfig {
+		// 初始化账户余额
+		balances: BalancesConfig { balances: vec![(1, 1000), (2, 2000), (3, 3000), (4, 4000)] },
+		..Default::default()
+	}
+	.assimilate_storage(&mut t) // use sp_runtime::BuildStorage;
+	.unwrap();
+	// pallet_balances::GenesisConfig::<Test> {
+	// 	// 初始化账户余额
+	// 	balances: vec![(1, 1000), (2, 2000), (3, 3000), (4, 4000)],
+	// }
+	// .assimilate_storage(&mut t)
+	// .unwrap();
+	let ext = sp_io::TestExternalities::new(t);
+	// ext.execute_with(|| System::set_block_number(1));
+	ext
+}
+
+// 跳转到指定块 先进后出执行顺序
+pub fn run_to_block(n: u64) {
+	while System::block_number() < n {
+		ExampleModule::on_finalize(System::block_number());
+		Balances::on_finalize(System::block_number());
+		System::on_finalize(System::block_number());
+		System::set_block_number(System::block_number() + 1);
+		System::on_initialize(System::block_number());
+		Balances::on_initialize(System::block_number());
+		ExampleModule::on_initialize(System::block_number());
+	}
 }
