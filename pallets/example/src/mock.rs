@@ -8,6 +8,7 @@ use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
+	BuildStorage,
 };
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
@@ -83,11 +84,19 @@ impl pallet_example::Config for Test {
 // 根据我们想要的模型构建一个创世存储键值存储
 pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
-	pallet_balances::GenesisConfig::<Test> {
-		balances: vec![(1, 1000), (2, 2000), (3, 3000), (4, 4000)],
+	GenesisConfig {
+		// 初始化账户余额
+		balances: BalancesConfig { balances: vec![(1, 1000), (2, 2000), (3, 3000), (4, 4000)] },
+		..Default::default()
 	}
-	.assimilate_storage(&mut t)
+	.assimilate_storage(&mut t) // use sp_runtime::BuildStorage;
 	.unwrap();
+	// pallet_balances::GenesisConfig::<Test> {
+	// 	// 初始化账户余额
+	// 	balances: vec![(1, 1000), (2, 2000), (3, 3000), (4, 4000)],
+	// }
+	// .assimilate_storage(&mut t)
+	// .unwrap();
 	let ext = sp_io::TestExternalities::new(t);
 	// ext.execute_with(|| System::set_block_number(1));
 	ext
