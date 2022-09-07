@@ -94,7 +94,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 }
 
 // 获取所有的事件
-fn events() -> Vec<Event> {
+pub fn events() -> Vec<Event> {
 	let evt = System::events().into_iter().map(|evt| evt.event).collect::<Vec<_>>();
 	System::reset_events();
 	evt

@@ -14,13 +14,12 @@ mod benchmarking;
 /// pallet逻辑的定义, 在`runtime/src/lib.rs`通过`construct_runtime`聚合
 #[frame_support::pallet]
 pub mod pallet {
-	use core::fmt::Debug;
-
 	use frame_support::{
 		pallet_prelude::*,
 		traits::{Currency, ReservableCurrency},
 	};
 	use frame_system::pallet_prelude::*;
+	use sp_std::fmt::Debug;
 
 	// ----------------------------------------------------------------
 	/// 定义余额类型
