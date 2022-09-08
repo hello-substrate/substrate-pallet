@@ -1,6 +1,6 @@
 [package]
 name = "pallet-example"
-version = "4.0.0-dev"
+version = "1.0.0"
 description = "FRAME pallet example for defining custom runtime logic."
 authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
 homepage = "https://substrate.io"
