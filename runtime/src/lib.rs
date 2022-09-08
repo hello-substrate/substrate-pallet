@@ -43,6 +43,7 @@ use pallet_transaction_payment::CurrencyAdapter;
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
+pub use pallet_example;
 /// Import the template pallet.
 pub use pallet_template;
 
@@ -273,6 +274,9 @@ impl pallet_template::Config for Runtime {
 // local or new pallet
 impl pallet_example::Config for Runtime {
 	type Event = Event;
+	type CustomType = u32;
+	type Amount = ConstU128<500>;
+	type Currency = Balances;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
