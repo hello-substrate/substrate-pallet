@@ -1,14 +1,14 @@
 
-.PHONY: b br
+.PHONY: b
 
 b:
-	cargo build
+	cargo build --release
+
+br:
+	cargo build --release && ./target/release/node-template --dev
 
 clear:
 	rm ~/.cargo/.package-cache
-
-br:
-	cargo build --release
 
 rr:
 	cargo run --release -- --dev
