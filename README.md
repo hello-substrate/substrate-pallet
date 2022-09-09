@@ -34,7 +34,6 @@ Secret phrase:       garment calm oppose urban genre mango hobby brown scrub adm
   Account ID:        0x3e7d28a354a9a2b720a785788cba777882e0ef20d797e50cc00adb1f4f467f3f
   Public key (SS58): 5DUe1JBcPM9kLVcfXQhSdJqETKx3USdDH4nrgRCL3NkT33vW
   SS58 Address:      5DUe1JBcPM9kLVcfXQhSdJqETKx3USdDH4nrgRCL3NkT33vW
-
 subkey inspect --password-interactive --scheme Ed25519 "garment calm oppose urban genre mango hobby brown scrub admit item globe"
 Secret phrase:       garment calm oppose urban genre mango hobby brown scrub admit item globe
   Network ID:        substrate
@@ -139,9 +138,10 @@ bs58 = { version = "0.4.0" }
 
 ```
 use sp_core::OpaquePeerId; // A struct wraps Vec<u8>, represents as our `PeerId`.
-use node_template_runtime::NodeAuthorizationConfig; // The genesis config that serves for our pallet.
+use node_template_runtime::NodeAuthorizationConfig;
 
 GenesisConfig 初始化默认已授权的 PeerID
+
 node_authorization: NodeAuthorizationConfig {
   nodes: vec![
     (
@@ -160,18 +160,33 @@ node_authorization: NodeAuthorizationConfig {
 
 `cargo check -p node-template-runtime`
 
-## 启动网络
+## 自定义链规范
 
-### 自定义链规范
+### 基于 local 链规范修改
 
-- 基于 local 链规范修改
+在 `node/src/chain_spec.rs` 中
+
+- 修改 `fn get_from_seed`
+
 ```
-node/src/chain_spec.rs
-复制并修改 fn local_testnet_config -> fn custom_testnet_config
+TPublic::Pair::from_string(&format!("//{}", seed), None)
+改为,以可以匹配 Secret phrase(短语) 与 Secret seed(0x开头的 64位 hex 字符串)
+let mut seed = seed.to_string(); // seed 末尾 ///xx ///后面表示密码
+if seed.len() < 20 {
+    seed = format!("//{}", seed); //兼容 local与dev链规范的 Alice等需要`//`开头的账户
+}
+TPublic::Pair::from_string(&seed, None)
+```
 
+- 复制并修改 `fn local_testnet_config -> fn custom_testnet_config`
+
+```
 pub fn custom_testnet_config() -> Result<ChainSpec, String> {
 	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
-
+	let root_seed = "0x7f97b4ac88cb629402cca06a69bb0eb67590d023e5fec1b0f219ff1d41dd9589";
+	let sun_seed = "0x55468d5b72d617bd46b2f2a0c962e00d7142bc854e04680f35751b4bd763a3ae";
+	let wen_seed = "0x6d3c76ed936d94a6ee005250b128d43a26e7cdac7db1d115c03c8eb5c6b8b0cc";
+	let ming_seed = "0x909cdd4ed7bd324d8e7245e1d9ba990df82deee3e08e641655e092ca9448dd21";
 	Ok(ChainSpec::from_genesis(
 		"Custom Testnet", // Name
 		"custom_testnet", // ID
@@ -180,23 +195,15 @@ pub fn custom_testnet_config() -> Result<ChainSpec, String> {
 			testnet_genesis(
 				wasm_binary,
 				// Initial PoA authorities
-				vec![authority_keys_from_seed("Alice"), authority_keys_from_seed("Bob")],
+				vec![authority_keys_from_seed(root_seed), authority_keys_from_seed(sun_seed)],
 				// Sudo account
-				get_account_id_from_seed::<sr25519::Public>("Alice"),
+				get_account_id_from_seed::<sr25519::Public>(root_seed),
 				// Pre-funded accounts
 				vec![
-					get_account_id_from_seed::<sr25519::Public>("Alice"),
-					get_account_id_from_seed::<sr25519::Public>("Bob"),
-					get_account_id_from_seed::<sr25519::Public>("Charlie"),
-					get_account_id_from_seed::<sr25519::Public>("Dave"),
-					get_account_id_from_seed::<sr25519::Public>("Eve"),
-					get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-					get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
-					get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
+					get_account_id_from_seed::<sr25519::Public>(root_seed),
+					get_account_id_from_seed::<sr25519::Public>(sun_seed),
+					get_account_id_from_seed::<sr25519::Public>(wen_seed),
+					get_account_id_from_seed::<sr25519::Public>(ming_seed),
 				],
 				true,
 			)
@@ -215,9 +222,88 @@ pub fn custom_testnet_config() -> Result<ChainSpec, String> {
 	))
 }
 ```
+
+- 导出链规范
+
+```
+cargo build --release && ./target/release/node-template build-spec --disable-default-bootnode --chain custom > customSpec.json
+
+1. name 链的名称
+2. chainType 只允许 Development, Local, Live, { "Custom": "Whatever you want" },
+3. aura 添加 Sr25519 SS58 地址密钥来指定有权创建块的节点
+4. grandpa 添加 Ed25519 SS58 地址密钥来指定有权完成区块的节点 第二个参数加权投票,默认权重为1票
+5. balances 初始化账户余额
+```
+
+- 必须将其转换为原始规范格式才能使用
+
+```
+./target/release/node-template build-spec --chain=customSpec.json --raw --disable-default-bootnode > customSpecRaw.json
+```
+
 - 新增链启动参数 --chain custom
+
 ```
 node/src/command.rs -> fn load_spec
 
 "custom" => Box::new(chain_spec::custom_testnet_config()?),
+```
+
+## 将账户密钥加入到节点目录中
+
+- aura 用于创建块
+- gran 验证和完成块
+- 清理缓存 `rm -rf /tmp/node01 && rm -rf /tmp/node02`
+
+```
+./target/release/node-template key insert --base-path /tmp/node01 \
+    --chain customSpecRaw.json --scheme Sr25519 \
+    --suri "attract broken prize foam expand clog scene net put broccoli whip bar" \
+    --password-interactive --key-type aura
+./target/release/node-template key insert --base-path /tmp/node01 \
+    --chain customSpecRaw.json --scheme Sr25519 \
+    --suri "0x7f97b4ac88cb629402cca06a69bb0eb67590d023e5fec1b0f219ff1d41dd9589" \
+    --password-interactive --key-type aura
+./target/release/node-template key insert --base-path /tmp/node01 \
+    --chain customSpecRaw.json --scheme Ed25519 \
+    --suri "0x7f97b4ac88cb629402cca06a69bb0eb67590d023e5fec1b0f219ff1d41dd9589" \
+    --password-interactive --key-type gran
+ls /tmp/node01/chains/custom_testnet/keystore
+
+节点二
+./target/release/node-template key insert --base-path /tmp/node02 \
+    --chain customSpecRaw.json --scheme Sr25519 \
+    --suri "0x55468d5b72d617bd46b2f2a0c962e00d7142bc854e04680f35751b4bd763a3ae" \
+    --password-interactive --key-type aura
+./target/release/node-template key insert --base-path /tmp/node02 \
+    --chain customSpecRaw.json --scheme Ed25519 \
+    --suri "0x55468d5b72d617bd46b2f2a0c962e00d7142bc854e04680f35751b4bd763a3ae" \
+    --password-interactive --key-type gran
+ls /tmp/node02/chains/custom_testnet/keystore
+```
+
+## 启动网络
+
+```
+./target/release/node-template --base-path /tmp/node01 \
+    --chain ./customSpecRaw.json \
+    --port 30333 \
+    --ws-port 9944 \
+    --rpc-port 9933 \
+    --telemetry-url "wss://telemetry.polkadot.io/submit/ 0" \
+    --node-key=2771a6fb1ee93a39773f4f26715966cad41db0d843c8e60f48b9e2cadf6b5906 \
+    --rpc-methods Unsafe \
+    --name MyNode01 --validator \
+    --password-interactive
+
+./target/release/node-template --base-path /tmp/node02 \
+    --chain ./customSpecRaw.json \
+    --port 30334 \
+    --ws-port 9945 \
+    --rpc-port 9934 \
+    --telemetry-url "wss://telemetry.polkadot.io/submit/ 0" \
+    --node-key=84decb33517c08018d8c7a18b597a5d8a2ce4cfe57d2ce1e97774da1368bb6a4 \
+    --rpc-methods Unsafe \
+    --name MyNode02 --validator \
+    --password-interactive
 ```
