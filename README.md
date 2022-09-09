@@ -2,6 +2,8 @@
 
 ## 随机生成账号
 
+生成的账户需要导入浏览器钱包中以供测试使用(如 polkadot 钱包插件)
+
 ### 第一个
 
 ```
@@ -295,7 +297,7 @@ ls /tmp/node02/chains/custom_testnet/keystore
     --telemetry-url "wss://telemetry.polkadot.io/submit/ 0" \
     --node-key=2771a6fb1ee93a39773f4f26715966cad41db0d843c8e60f48b9e2cadf6b5906 \
     --rpc-methods Unsafe \
-    --name MyNode01 --validator \
+    --name root --validator \
     --password-interactive
 
 ./target/release/node-template --base-path /tmp/node02 \
@@ -306,7 +308,7 @@ ls /tmp/node02/chains/custom_testnet/keystore
     --telemetry-url "wss://telemetry.polkadot.io/submit/ 0" \
     --node-key=84decb33517c08018d8c7a18b597a5d8a2ce4cfe57d2ce1e97774da1368bb6a4 \
     --rpc-methods Unsafe \
-    --name MyNode02 --validator \
+    --name sun --validator \
     --password-interactive
 ```
 
@@ -319,14 +321,69 @@ ls /tmp/node02/chains/custom_testnet/keystore
 > 未在创世存储初始化的节点无法连接到 peers. 所以必须授权此节点才可连接.
 > 调用 Sudo 托盘手动添加所有其他未创世存储的节点
 
-### 授权第三个节点的访问
+```
+./target/release/node-template --base-path /tmp/node03 \
+    --chain ./customSpecRaw.json \
+    --name wen --validator \
+    --node-key=e4e6a2fe748c955b7306edfbe00c9868e7eab2b919427188dfe4bedb2de1d57c \
+    --port 30335 \
+    --ws-port 9946 \
+    --offchain-worker always
+```
 
-> 目前使用 sudo pallet 治理,使用 sudo pallet 调用 node-authorization -> add_well_known_node 方法添加此节点
+### 授权第三个节点的访问
 
 - 打开[polkadot.js.org](https://polkadot.js.org/apps/?rpc=ws%3A%2F%2F127.0.0.1%3A9944#/explorer)
 
-> Developer -> Sudo -> nodeAuthorization -> add_well_known_node
-> 参数 node:PeerId -> bs58 decoded的值 0x002408011220ebada9e91ff135d71f47fa3c4daf336fc569db64baf04999ed768998bf11b22e
-> 参数 owner:AccountId -> 选择一个账户
+> Developer -> Sudo -> nodeAuthorization -> add_well_known_node(若 sudo 标签不存在,检查 accounts 中是否包含 sudo key
+> 配置的账户).
+
+- 参数 node:PeerId -> bs58 decoded的值 0x002408011220ebada9e91ff135d71f47fa3c4daf336fc569db64baf04999ed768998bf11b22e
+- 参数 owner:AccountId -> 选择一个账户
+
 > 这三个节点可以使用本地网络中默认启用的mDNS发现机制找到彼此,节点不在同一个本地网络上，您应该使用命令行选项--no-mdns来禁用它
 
+## 添加子节点
+
+> 子节点只能通过连接到 某个账户 拥有的节点才能访问网络.
+> 父节点负责所有子节点的连接授权和访问控制(如果子节点需要移除或审计).
+
+- 此处父节点使用上方的 wen 账户
+
+```
+./target/release/node-template --base-path /tmp/node04 \
+    --chain ./customSpecRaw.json \
+    --name ming --validator \
+    --node-key=05e36c497df61895ca7a3a548dcaf475d22edc070416b910dba13b6b15d07888 \
+    --port 30336 \
+    --ws-port 9947 \
+    --offchain-worker always
+```
+
+### ming 声明为节点的所有者
+
+> ming 账户提交一个 nodeAuthorization -> claim_node
+
+- node:PeerId = ming 节点的 0x002408011220f1294d52c768ebe73f54b9adfb3a022c0f4676a98fc2c67f541928ae07e2b524
+
+### wen 配置允许来自 ming 的节点连接
+
+> 在 Developer -> Extrinsic 中 wen 账户提交一个 nodeAuthorization -> addConnections
+
+- node:PeerId = wen 节点的 0x002408011220ebada9e91ff135d71f47fa3c4daf336fc569db64baf04999ed768998bf11b22e
+- connections: Vec<PeerId>(允许连接的节点数组) = ming 节点的
+  0x002408011220f1294d52c768ebe73f54b9adfb3a022c0f4676a98fc2c67f541928ae07e2b524
+
+### ming 配置允许来自 wen 的节点连接
+
+> 在 Developer -> Extrinsic 中 ming 账户提交一个 nodeAuthorization -> addConnections
+
+- node:PeerId = ming 节点的 0x002408011220f1294d52c768ebe73f54b9adfb3a022c0f4676a98fc2c67f541928ae07e2b524
+- connections: Vec<PeerId>(允许连接的节点数组) = wen 节点的
+  0x002408011220ebada9e91ff135d71f47fa3c4daf336fc569db64baf04999ed768998bf11b22e
+
+> 现在应该看到 ming 正在追赶 blocks,并且仅仅只有一个 peer 属于 wen 节点！重新启动 ming 的节点，以防它没有立即与 web 连接
+
+> 到此,任何运行的节点都可以发出 Extrinsic 影响其他节点的链上数据,并且您在 keystore 中拥有账户的签名密钥.
+> 此演示中的所有节点都可以访问开发人员签名密钥,因此我们能够代表 wen 从我们网络上的任何连接节点发出影响 wen 子节点的命令.
+> 在现实世界的应用程序中,节点操作员只能访问他们的节点密钥,并且是唯一能够正确签署和提交外部信息的人,很可能来自他们自己的节点，他们可以控制密钥的安全性。

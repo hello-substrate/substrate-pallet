@@ -30,7 +30,7 @@ node1:
 
 node2:
 	./target/release/node-template --base-path /tmp/node02 \
-        --chain ./customSpecRaw.json \
+        --chain custom \
         --port 30334 \
         --ws-port 9945 \
         --rpc-port 9934 \
@@ -39,3 +39,21 @@ node2:
         --rpc-methods Unsafe \
         --name MyNode02 --validator \
         --password-interactive
+
+node3:
+	./target/release/node-template --base-path /tmp/node03 \
+        --chain custom \
+        --name MyNode03 --validator \
+        --node-key=e4e6a2fe748c955b7306edfbe00c9868e7eab2b919427188dfe4bedb2de1d57c \
+        --port 30335 \
+        --ws-port 9946 \
+        --offchain-worker always
+
+node4:
+	./target/release/node-template --base-path /tmp/node04 \
+        --chain custom \
+        --name MyNode04 --validator \
+        --node-key=05e36c497df61895ca7a3a548dcaf475d22edc070416b910dba13b6b15d07888 \
+        --port 30336 \
+        --ws-port 9947 \
+        --offchain-worker always
