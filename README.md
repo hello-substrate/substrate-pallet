@@ -284,6 +284,8 @@ ls /tmp/node02/chains/custom_testnet/keystore
 
 ## 启动网络
 
+启动完成可以看到块的产出
+
 ```
 ./target/release/node-template --base-path /tmp/node01 \
     --chain ./customSpecRaw.json \
@@ -307,3 +309,24 @@ ls /tmp/node02/chains/custom_testnet/keystore
     --name MyNode02 --validator \
     --password-interactive
 ```
+
+## 将第三个节点加入the list of well-known nodes
+
+> node-authorization 托盘使用链下工作者来配置节点连接.由于此节点的账户不在 node_authorization 创世存储中配置.
+> 不是一个 well-known node,并将第四个节点网络配置为只读子节点. 必须在命令行选项以启用链外工作者程序(--offchain-worker
+> always)
+
+> 未在创世存储初始化的节点无法连接到 peers. 所以必须授权此节点才可连接.
+> 调用 Sudo 托盘手动添加所有其他未创世存储的节点
+
+### 授权第三个节点的访问
+
+> 目前使用 sudo pallet 治理,使用 sudo pallet 调用 node-authorization -> add_well_known_node 方法添加此节点
+
+- 打开[polkadot.js.org](https://polkadot.js.org/apps/?rpc=ws%3A%2F%2F127.0.0.1%3A9944#/explorer)
+
+> Developer -> Sudo -> nodeAuthorization -> add_well_known_node
+> 参数 node:PeerId -> bs58 decoded的值 0x002408011220ebada9e91ff135d71f47fa3c4daf336fc569db64baf04999ed768998bf11b22e
+> 参数 owner:AccountId -> 选择一个账户
+> 这三个节点可以使用本地网络中默认启用的mDNS发现机制找到彼此,节点不在同一个本地网络上，您应该使用命令行选项--no-mdns来禁用它
+
