@@ -51,6 +51,8 @@ hex-literal = { version = "0.3.4", optional = true }
 # Local or new Dependencies
 pallet-template = { version = "4.0.0-dev", default-features = false, path = "../pallets/template" }
 pallet-example = { version = "1.0.0", default-features = false, path = "../pallets/example" }
+pallet-node-authorization = { default-features = false, version = "4.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.27" }
+
 
 [build-dependencies]
 substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.27" }
@@ -86,6 +88,7 @@ std = [
 	"sp-version/std",
 	# local or new
 	"pallet-example/std",
+	"pallet-node-authorization/std",
 ]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",

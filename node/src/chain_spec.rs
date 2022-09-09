@@ -124,6 +124,10 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	))
 }
 
+
+use sp_core::OpaquePeerId; // A struct wraps Vec<u8>, represents as our `PeerId`.
+use node_template_runtime::NodeAuthorizationConfig; // The genesis config that serves for our pallet.
+
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
 	wasm_binary: &[u8],
@@ -152,5 +156,17 @@ fn testnet_genesis(
 			key: Some(root_key),
 		},
 		transaction_payment: Default::default(),
+		node_authorization: NodeAuthorizationConfig {
+			nodes: vec![
+				(
+					OpaquePeerId(bs58::decode("12D3KooWS1bPAhtw8Rq7fi86sxAbSn8FygbtrEFqmc2cdwpkSbdW").into_vec().unwrap()),
+					endowed_accounts[0].clone()
+				),
+				(
+					OpaquePeerId(bs58::decode("12D3KooWSF9KBXnESAVvd8p7pmZpYi4ykmVwHYYqWcp6SR5dckwE").into_vec().unwrap()),
+					endowed_accounts[1].clone()
+				),
+			],
+		},
 	}
 }

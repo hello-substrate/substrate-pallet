@@ -278,6 +278,17 @@ impl pallet_example::Config for Runtime {
 	type Amount = ConstU128<500>;
 	type Currency = Balances;
 }
+use frame_system::EnsureRoot;
+impl pallet_node_authorization::Config for Runtime {
+	type Event = Event;
+	type MaxWellKnownNodes = ConstU32<8>;
+	type MaxPeerIdLength = ConstU32<128>;
+	type AddOrigin = EnsureRoot<AccountId>;
+	type RemoveOrigin = EnsureRoot<AccountId>;
+	type SwapOrigin = EnsureRoot<AccountId>;
+	type ResetOrigin = EnsureRoot<AccountId>;
+	type WeightInfo = ();
+}
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -298,6 +309,7 @@ construct_runtime!(
 		TemplateModule: pallet_template,
 		// local or new pallet
 		ExampleModule: pallet_example,
+		NodeAuthorization: pallet_node_authorization::{Pallet, Call, Storage, Event<T>, Config<T>},
 	}
 );
 

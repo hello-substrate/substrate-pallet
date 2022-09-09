@@ -13,5 +13,5 @@ clear:
 rr:
 	cargo run --release -- --dev
 
-c:
+check:
 	cargo check -p node-template-runtime
