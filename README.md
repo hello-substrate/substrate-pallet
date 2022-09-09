@@ -215,7 +215,7 @@ pub fn custom_testnet_config() -> Result<ChainSpec, String> {
 	))
 }
 ```
-- 新增启动参数 --chain custom
+- 新增链启动参数 --chain custom
 ```
 node/src/command.rs -> fn load_spec
 
