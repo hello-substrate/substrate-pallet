@@ -1,4 +1,5 @@
 # 联盟链
+可参考教程 https://zhuanlan.zhihu.com/p/342488512
 
 ## 随机生成账号
 
