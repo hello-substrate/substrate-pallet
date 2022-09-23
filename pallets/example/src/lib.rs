@@ -136,7 +136,8 @@ pub mod pallet {
 			)
 		}
 	}
-	// off-chain index 传输的数据 (调度函数的 func 名称, block_number)
+
+	/// off-chain index 传输的数据封装.
 	#[derive(Debug, serde::Deserialize, Encode, Decode, Default)]
 	struct IndexingData(Vec<u8>, u64);
 	// ====================
