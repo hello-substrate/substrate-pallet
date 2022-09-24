@@ -15,12 +15,10 @@ mod benchmarking;
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::{
-		inherent::Vec,
 		pallet_prelude::*,
 		traits::{Currency, ReservableCurrency},
 	};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::offchain::storage::{MutateStorageError, StorageRetrievalError, StorageValueRef};
 	use sp_std::fmt::Debug;
 
 	// ----------------------------------------------------------------
@@ -76,44 +74,11 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn offchain_worker(block_number: T::BlockNumber) {
 			log::info!("-- Hello World from offchain workers!: {:?}", block_number);
-			// 奇数块向 Local Storage 写数据，偶数块读取数据，并检查
-			if block_number % 2u32.into() != sp_runtime::traits::Zero::zero() {
-				let key = Self::get_key(block_number);
-				let val_ref = StorageValueRef::persistent(&key);
-				// get a local random value
-				let random_slice = sp_io::offchain::random_seed();
-				// get current timestamp
-				let timestamp = sp_io::offchain::timestamp().unix_millis();
-				let value = (random_slice, timestamp);
-				log::info!("-- in odd block,value: {:?}", value);
+			// get offchain timestamp add 8 second
+			let timeout =
+				sp_io::offchain::timestamp().add(sp_runtime::offchain::Duration::from_millis(8000));
 
-				struct StateError;
-
-				//  write or mutate tuple content to key
-				let res = val_ref.mutate(|val: Result<Option<([u8;32], u64)>, StorageRetrievalError>| -> Result<_, StateError> {
-					match val {
-						Ok(Some(_)) => Ok(value),
-						_ => Ok(value),
-					}
-				});
-
-				match res {
-					Ok(value) => {
-						log::info!("in odd block, mutate successfully: {:?}", value);
-					},
-					Err(MutateStorageError::ValueFunctionFailed(_)) => (),
-					Err(MutateStorageError::ConcurrentModification(_)) => (),
-				}
-			} else {
-				let key = Self::get_key(block_number - 1u32.into());
-				let mut val_ref = StorageValueRef::persistent(&key);
-
-				if let Ok(Some(value)) = val_ref.get::<([u8; 32], u64)>() {
-					log::info!("-- in even block,value: {:?}", value);
-					// clear
-					val_ref.clear();
-				}
-			}
+			sp_io::offchain::sleep_until(timeout);
 			log::info!("Leave from offchain workers!: {:?}", block_number);
 		}
 	}
@@ -143,14 +108,6 @@ pub mod pallet {
 					Ok(())
 				},
 			}
-		}
-	}
-
-	impl<T: Config> Pallet<T> {
-		fn get_key(block_number: T::BlockNumber) -> Vec<u8> {
-			block_number.using_encoded(|val| {
-				b"pallet-example::storage::".iter().chain(val).copied().collect::<Vec<u8>>()
-			})
 		}
 	}
 }

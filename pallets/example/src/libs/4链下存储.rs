@@ -20,7 +20,7 @@ pub mod pallet {
 		traits::{Currency, ReservableCurrency},
 	};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::offchain::storage::{MutateStorageError, StorageRetrievalError, StorageValueRef};
+	use sp_runtime::offchain::storage::StorageValueRef;
 	use sp_std::fmt::Debug;
 
 	// ----------------------------------------------------------------
@@ -86,24 +86,7 @@ pub mod pallet {
 				let timestamp = sp_io::offchain::timestamp().unix_millis();
 				let value = (random_slice, timestamp);
 				log::info!("-- in odd block,value: {:?}", value);
-
-				struct StateError;
-
-				//  write or mutate tuple content to key
-				let res = val_ref.mutate(|val: Result<Option<([u8;32], u64)>, StorageRetrievalError>| -> Result<_, StateError> {
-					match val {
-						Ok(Some(_)) => Ok(value),
-						_ => Ok(value),
-					}
-				});
-
-				match res {
-					Ok(value) => {
-						log::info!("in odd block, mutate successfully: {:?}", value);
-					},
-					Err(MutateStorageError::ValueFunctionFailed(_)) => (),
-					Err(MutateStorageError::ConcurrentModification(_)) => (),
-				}
+				val_ref.set(&value)
 			} else {
 				let key = Self::get_key(block_number - 1u32.into());
 				let mut val_ref = StorageValueRef::persistent(&key);
