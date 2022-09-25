@@ -58,5 +58,22 @@
 - 在示例4的基础上，使用mutate方法对数据进行原子更改
 - 可以学到：新的原子操作修改方法（不再使用之前手动锁的方式），学习配套的错误处理模式
 
+## 外部 Http 接口 Json 数据
+
+- `make 6`
+- 学会在Offchain Worker中发起https请求，获取数据（boilerplate）
+- 学习如何使用serde_json解析获取到的json数据
+- 学习serde的类型转换和调试相关知识
+
+## 向链上发送签名交易
+
+- `make 7`
+- Node, runtime, pallet中都需要改，地方有点多
+- 大部分都是boilerplate代码，非常固定，不需要理解每个地方。重点要理解原理和整个流程
+- 签名交易，需要有账户给它签名。交易的执行会向这个账户收 tx fee
+- 本示例提供了能运行的最小化实例，没有多余的代码干扰
+- 多查阅 https://crates.parity.io/sc_service/index.html
+
+
 
 

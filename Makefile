@@ -26,4 +26,6 @@ c:
 	cp pallets/example/src/libs/4链下存储.rs pallets/example/src/lib.rs && cargo run --release -- --dev
 5:
 	cp pallets/example/src/libs/5原子更改.rs pallets/example/src/lib.rs && cargo run --release -- --dev
+6:
+	cp pallets/example/src/libs/6http请求.rs pallets/example/src/lib.rs && cargo run --release -- --dev
 
