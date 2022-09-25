@@ -32,7 +32,7 @@ pub mod crypto {
 	}
 
 	impl frame_system::offchain::AppCrypto<<Sr25519Signature as Verify>::Signer, Sr25519Signature>
-	for OcwAuthId
+		for OcwAuthId
 	{
 		type RuntimeAppPublic = Public;
 		type GenericPublic = sp_core::sr25519::Public;
@@ -58,7 +58,7 @@ pub mod pallet {
 	// ----------------------------------------------------------------
 	/// 定义余额类型
 	type BalanceOf<T> =
-	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 	// ----------------------------------------------------------------
 
 	/// pallet config trait, 所有的类型和常量`constant`在这里配置
@@ -70,15 +70,15 @@ pub mod pallet {
 
 		// 自定义类型
 		type CustomType: Parameter
-		+ Member
-		+ sp_runtime::traits::AtLeast32BitUnsigned
-		+ codec::Codec
-		+ Default
-		+ Copy
-		+ MaybeSerializeDeserialize
-		+ Debug
-		+ MaxEncodedLen
-		+ TypeInfo;
+			+ Member
+			+ sp_runtime::traits::AtLeast32BitUnsigned
+			+ codec::Codec
+			+ Default
+			+ Copy
+			+ MaybeSerializeDeserialize
+			+ Debug
+			+ MaxEncodedLen
+			+ TypeInfo;
 		/// 金额
 		#[pallet::constant]
 		type Amount: Get<BalanceOf<Self>>;
@@ -156,15 +156,15 @@ pub mod pallet {
 			}
 		}
 
-		#[pallet::weight(0)]
-		pub fn submit_signed_tx(
-			origin: OriginFor<T>,
-			payload: Vec<u8>,
-		) -> DispatchResultWithPostInfo {
-			let _who = ensure_signed(origin)?;
-			log::info!("in submit_data call: {:?}", payload);
-			Ok(().into())
-		}
+			#[pallet::weight(0)]
+			pub fn submit_signed_tx(
+				origin: OriginFor<T>,
+				payload: Vec<u8>,
+			) -> DispatchResultWithPostInfo {
+				let _who = ensure_signed(origin)?;
+				log::info!("--in submit_signed_tx call: {:?}", payload);
+				Ok(().into())
+			}
 	}
 	impl<T: Config> Pallet<T> {
 		/// all_accounts() 所有的账户都执行一次交易
@@ -182,8 +182,16 @@ pub mod pallet {
 			// Vec<(Account<T>, Result<(), ()>)>;
 			for (acc, res) in &results {
 				match res {
-					Ok(()) => log::info!("--send_signed_tx_all: [{:?}] Submitted data:{:?}", acc.id, payload),
-					Err(e) => log::error!("--send_signed_tx_all: [{:?}] Failed to submit transaction: {:?}", acc.id, e),
+					Ok(()) => log::info!(
+						"--send_signed_tx_all: [{:?}] Submitted data:{:?}",
+						acc.id,
+						payload
+					),
+					Err(e) => log::error!(
+						"--send_signed_tx_all: [{:?}] Failed to submit transaction: {:?}",
+						acc.id,
+						e
+					),
 				}
 			}
 			Ok(())
@@ -205,11 +213,19 @@ pub mod pallet {
 			match result {
 				Some((acc, res)) => match res {
 					Ok(()) => {
-						log::info!("--send_signed_tx_any: [{:?}] Submitted data:{:?}", acc.id, payload);
+						log::info!(
+							"--send_signed_tx_any: [{:?}] Submitted data:{:?}",
+							acc.id,
+							payload
+						);
 						Ok(())
 					},
 					Err(e) => {
-						log::error!("--send_signed_tx_any: [{:?}] Failed to submit transaction: {:?}", acc.id, e);
+						log::error!(
+							"--send_signed_tx_any: [{:?}] Failed to submit transaction: {:?}",
+							acc.id,
+							e
+						);
 						Err(Error::<T>::OffchainSignedTxError)
 					},
 				},

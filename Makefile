@@ -36,4 +36,8 @@ reset:
 	cp node/src/7签名交易.rs node/src/service.rs && \
 	cp runtime/src/7签名交易.rs runtime/src/lib.rs && \
  	cargo run --release -- --dev
+8: reset
+	cp pallets/example/src/libs/8未签名交易.rs pallets/example/src/lib.rs && \
+	cp runtime/src/8未签名交易.rs runtime/src/lib.rs && \
+ 	cargo run --release -- --dev
 
