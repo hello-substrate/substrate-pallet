@@ -17,6 +17,7 @@ pub mod pallet {
 	use frame_support::{
 		pallet_prelude::*,
 		traits::{Currency, ReservableCurrency},
+		PalletId,
 	};
 	use frame_system::{
 		offchain::{SendTransactionTypes, SubmitTransaction},
@@ -27,7 +28,7 @@ pub mod pallet {
 	// ----------------------------------------------------------------
 	/// 定义余额类型
 	type BalanceOf<T> =
-	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 	// ----------------------------------------------------------------
 
 	/// pallet config trait, 所有的类型和常量`constant`在这里配置
@@ -36,15 +37,15 @@ pub mod pallet {
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 		// 自定义类型
 		type CustomType: Parameter
-		+ Member
-		+ sp_runtime::traits::AtLeast32BitUnsigned
-		+ codec::Codec
-		+ Default
-		+ Copy
-		+ MaybeSerializeDeserialize
-		+ Debug
-		+ MaxEncodedLen
-		+ TypeInfo;
+			+ Member
+			+ sp_runtime::traits::AtLeast32BitUnsigned
+			+ codec::Codec
+			+ Default
+			+ Copy
+			+ MaybeSerializeDeserialize
+			+ Debug
+			+ MaxEncodedLen
+			+ TypeInfo;
 		/// 金额
 		#[pallet::constant]
 		type Amount: Get<BalanceOf<Self>>;
@@ -138,7 +139,7 @@ pub mod pallet {
 		fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
 			let valid_tx = |provide| {
 				// 参数参考 https://github.com/paritytech/substrate/blob/master/frame/examples/offchain-worker/src/lib.rs
-				ValidTransaction::with_tag_prefix("ExampleModule")
+				ValidTransaction::with_tag_prefix("pallet-example")
 					.priority(TransactionPriority::MAX)
 					.and_provides([&provide]) // 添加一个 TransactionTag
 					.longevity(5) //交易的寿命。此处设置 5 blockNumber. 默认情况下，交易将被视为永久有效

@@ -180,4 +180,11 @@ impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
 
 ## 不签名交易并带有签名负载
 
+## 使用 offchain index 从链上向链下存储写数据
+
+## 在 front 前端中 获取链下存储的数据
+
+## 完整的案例
+
+- https://github.com/paritytech/substrate/blob/master/frame/examples/offchain-worker/src/lib.rs
 
