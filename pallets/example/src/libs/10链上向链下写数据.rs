@@ -1,7 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
-use sp_core::crypto::KeyTypeId;
 
 #[cfg(test)]
 mod mock;
@@ -17,16 +16,13 @@ mod benchmarking;
 pub mod pallet {
 	use super::*;
 	use frame_support::{
+		inherent::Vec,
 		pallet_prelude::*,
 		traits::{Currency, ReservableCurrency},
 	};
-	use frame_system::{
-		offchain::{
-			AppCrypto, CreateSignedTransaction, SendUnsignedTransaction, SignedPayload, Signer,
-			SigningTypes,
-		},
-		pallet_prelude::*,
-	};
+
+	use frame_system::pallet_prelude::*;
+	use sp_runtime::offchain::storage::StorageValueRef;
 	use sp_std::fmt::Debug;
 
 	// ----------------------------------------------------------------
@@ -35,15 +31,13 @@ pub mod pallet {
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 	/// off-chain index 传输的数据封装.
 	#[derive(Debug, Encode, Decode, Default)]
-	struct IndexingData(Vec<u8>, u64);
+	struct IndexingData(Vec<u8>, u32);
 	// ----------------------------------------------------------------
 
 	/// pallet config trait, 所有的类型和常量`constant`在这里配置
 	#[pallet::config]
-	pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
+	pub trait Config: frame_system::Config {
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
-
-		type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
 
 		// 自定义类型
 		type CustomType: Parameter
@@ -92,7 +86,7 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn offchain_worker(block_number: T::BlockNumber) {
 			log::info!("-- Hello World from offchain workers!: {:?}", block_number);
-			Self::print_offchian_index_data();
+			Self::print_offchian_index_data(block_number);
 			log::info!("Leave from offchain workers!: {:?}", block_number);
 		}
 	}
@@ -128,7 +122,7 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn set_offchain_storage(
 			origin: OriginFor<T>,
-			payload: u32,
+			number: u32,
 		) -> DispatchResultWithPostInfo {
 			let _who = ensure_signed(origin)?;
 			let key = Self::derived_index_key(frame_system::Pallet::<T>::block_number());
@@ -137,11 +131,12 @@ pub mod pallet {
 			Ok(().into())
 		}
 	}
+
 	impl<T: Config> Pallet<T> {
 		// 根据 block_number 生产 off-chain key
 		fn derived_index_key(block_number: T::BlockNumber) -> Vec<u8> {
 			block_number.using_encoded(|encoded_block_number| {
-				b"pallet-example::storage::"
+				b"pallet-example::indexing::"
 					.iter()
 					.chain(encoded_block_number) //将两个迭代器链接在一起创建新的迭代器
 					.copied() //复制所有元素到新创建新的迭代器中。这很有用,当您有一个基于 &T
@@ -150,9 +145,9 @@ pub mod pallet {
 			})
 		}
 
-		fn print_offchian_index_data() {
+		fn print_offchian_index_data(block_number: T::BlockNumber) {
 			// 获取 off-chain indexing 数据.
-			let key = Self::derived_key(block_number);
+			let key = Self::derived_index_key(block_number);
 			let index_storage_info = StorageValueRef::persistent(&key);
 			if let Ok(Some(data)) = index_storage_info.get::<IndexingData>() {
 				log::info!(

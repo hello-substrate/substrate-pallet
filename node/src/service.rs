@@ -206,15 +206,6 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
 		})?;
 
 	if config.offchain_worker.enabled {
-		let keystore = keystore_container.sync_keystore();
-		// Initialize seed for signing transaction using off-chain workers
-		sp_keystore::SyncCryptoStore::sr25519_generate_new(
-			&*keystore,
-			node_template_runtime::pallet_example::KEY_TYPE, // 将账户注入 pallet 中使用
-			Some("//Alice"),
-		)
-		.expect("Creating key with account Alice should succeed.");
-
 		sc_service::build_offchain_workers(
 			&config,
 			task_manager.spawn_handle(),

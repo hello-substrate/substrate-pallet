@@ -188,7 +188,11 @@ impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
 
 ## 使用 offchain index 从链上向链下存储写数据
 
+- `make 10`
+
 ## 在 front 前端中 获取链下存储的数据
+
+- [front](./substrate-front-end-template)
 
 ## 完整的案例
 

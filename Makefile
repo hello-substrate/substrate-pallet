@@ -11,7 +11,7 @@ clear:
 	rm ~/.cargo/.package-cache
 
 r:
-	cargo run --release -- --dev
+	cargo run --release -- --dev --enable-offchain-indexing true
 
 c:
 	cargo check -p node-template-runtime
@@ -45,3 +45,6 @@ reset:
 	cp node/src/9未签名交易带签名负载.rs node/src/service.rs && \
 	cp runtime/src/9未签名交易带签名负载.rs runtime/src/lib.rs && \
  	cargo run --release -- --dev
+10: reset
+	cp pallets/example/src/libs/10链上向链下写数据.rs pallets/example/src/lib.rs && \
+ 	cargo run --release -- --dev --enable-offchain-indexing true
