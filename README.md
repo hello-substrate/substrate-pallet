@@ -74,6 +74,22 @@
 - 本示例提供了能运行的最小化实例，没有多余的代码干扰
 - 多查阅 https://crates.parity.io/sc_service/index.html
 
+### 新生成一个账户放在 keystore 中
+
+在 ./node/src/service.rs 中 搜索 offchain_worker 添加代码
+
+```
+if config.offchain_worker.enabled {
+  let keystore = keystore_container.sync_keystore();
+  // Initialize seed for signing transaction using off-chain workers
+  sp_keystore::SyncCryptoStore::sr25519_generate_new(
+      &*keystore,
+      node_template_runtime::pallet_example::KEY_TYPE,// 将账户注入 pallet 中使用
+      Some("//Alice"),
+  )
+  .expect("Creating key with account Alice should succeed.");
+}
+```
 
 
 
