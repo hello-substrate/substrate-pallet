@@ -2,8 +2,8 @@
 
 ## ppt
 
-[ppt](./offchain-worker文档.pptx)
-[code](https://github.com/miketang84/oneblockplus_offchain_lesson)
+- [ppt](./offchain-worker文档.pptx)
+- [code](https://github.com/miketang84/oneblockplus_offchain_lesson)
 
 ## 知识点
 
@@ -157,18 +157,19 @@ impl pallet_example::Config for Runtime {
 }
 ```
 
-## 不签名交易
+## 未签名交易
 
+- `make 8`
 - 要改runtime和pallet，比签名交易代码要少一些
 - 大部分都是boilerplate代码，非常固定。重点要理解原理和整个流程
-- 不签名交易，无 tx fee，因为找不到人收费
+- 未签名交易，无 tx fee，因为找不到人收费
 - #[pallet::validate_unsigned], TransactionValidity, ValidTransaction, ensure_none 等
-- 每个块的不签名交易不能太多，Substrate不鼓励发不签名交易
+- 每个块的未签名交易不能太多，Substrate不鼓励发未签名交易
 
 ### runtime/src/libs
 
 ```
-// 不签名交易
+// 未签名交易
 impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
 	where
 		Call: From<C>,
@@ -178,7 +179,12 @@ impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
 }
 ```
 
-## 不签名交易并带有签名负载
+## 未签名交易并带有签名负载
+
+在 [向链上发送签名交易](https://github.com/hello-substrate/substrate-pallet/tree/offchain-worker#向链上发送签名交易)
+基础上修改代码
+
+- `make 9`
 
 ## 使用 offchain index 从链上向链下存储写数据
 

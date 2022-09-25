@@ -271,7 +271,7 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
-// 不签名交易
+// 未签名交易
 impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
 	where
 		Call: From<C>,
