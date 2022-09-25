@@ -77,7 +77,7 @@ pub mod pallet {
 	pub enum Error<T> {
 		NoneValue,
 		StorageOverflow,
-		AccountNotSign,
+		NoAccountCanSign,
 		NoLocalAcctForSigning,
 		OffchainSignedTxError,
 		NoOffchainFunc,

@@ -106,7 +106,7 @@ pub mod pallet {
 	pub enum Error<T> {
 		NoneValue,
 		StorageOverflow,
-		AccountNotSign,
+		NoAccountCanSign,
 		NoLocalAcctForSigning,
 		OffchainSignedTxError,
 		NoOffchainFunc,
@@ -172,7 +172,7 @@ pub mod pallet {
 			// 在 sp_keystore 中寻找账户
 			let signer = Signer::<T, T::AuthorityId>::all_accounts();
 			if !signer.can_sign() {
-				return Err(Error::<T>::AccountNotSign)
+				return Err(Error::<T>::NoAccountCanSign)
 			}
 			// 发送链上签名的交易,最终调用已 runtime 声明的
 			// frame_system::offchain::CreateSignedTransaction::create_transaction()
@@ -200,7 +200,7 @@ pub mod pallet {
 		fn send_signed_tx_any(payload: Vec<u8>) -> Result<(), Error<T>> {
 			let signer = Signer::<T, T::AuthorityId>::any_account();
 			if !signer.can_sign() {
-				return Err(Error::<T>::AccountNotSign)
+				return Err(Error::<T>::NoAccountCanSign)
 			}
 			let result = signer.send_signed_transaction(|_account| Call::submit_signed_tx {
 				payload: payload.clone(),

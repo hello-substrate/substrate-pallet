@@ -57,7 +57,7 @@ pub mod crypto {
 
 	// implemented for mock runtime in test
 	impl frame_system::offchain::AppCrypto<<Sr25519Signature as Verify>::Signer, Sr25519Signature>
-		for OcwAuthId
+	for OcwAuthId
 	{
 		type RuntimeAppPublic = Public;
 		type GenericPublic = sp_core::sr25519::Public;
@@ -84,7 +84,7 @@ pub mod pallet {
 	// ----------------------------------------------------------------
 	/// 定义余额类型
 	type BalanceOf<T> =
-		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 	/// Payload used by this example crate to hold price
 	/// data required to submit a transaction.
@@ -135,15 +135,15 @@ pub mod pallet {
 
 		// 自定义类型
 		type CustomType: Parameter
-			+ Member
-			+ sp_runtime::traits::AtLeast32BitUnsigned
-			+ codec::Codec
-			+ Default
-			+ Copy
-			+ MaybeSerializeDeserialize
-			+ Debug
-			+ MaxEncodedLen
-			+ TypeInfo;
+		+ Member
+		+ sp_runtime::traits::AtLeast32BitUnsigned
+		+ codec::Codec
+		+ Default
+		+ Copy
+		+ MaybeSerializeDeserialize
+		+ Debug
+		+ MaxEncodedLen
+		+ TypeInfo;
 		/// 金额
 		#[pallet::constant]
 		type Amount: Get<BalanceOf<Self>>;

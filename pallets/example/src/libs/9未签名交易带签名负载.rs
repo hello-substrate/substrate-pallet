@@ -119,7 +119,7 @@ pub mod pallet {
 	pub enum Error<T> {
 		NoneValue,
 		StorageOverflow,
-		AccountNotSign,
+		NoAccountCanSign,
 		NoLocalAcctForSigning,
 		OffchainSignedTxError,
 		NoOffchainFunc,
@@ -180,7 +180,7 @@ pub mod pallet {
 			// 在 sp_keystore 中寻找账户
 			let signer = Signer::<T, T::AuthorityId>::all_accounts();
 			if !signer.can_sign() {
-				return Err(Error::<T>::AccountNotSign)
+				return Err(Error::<T>::NoAccountCanSign)
 			}
 			let number: u64 = block_number.try_into().unwrap_or(0);
 			// 第一个闭包，返回一个SignedPayload对象，第二个返回要进行的链上调用。

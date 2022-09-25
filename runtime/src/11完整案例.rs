@@ -327,9 +327,16 @@ impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
 }
 // 签名交易模版代码结束
 // local or new pallet
+parameter_types! {
+	pub const UnsignedPriority: u64 = 1 << 20;
+}
 impl pallet_example::Config for Runtime {
 	type Event = Event;
 	type AuthorityId = pallet_example::crypto::OcwAuthId;
+	type GracePeriod = ConstU32<5>;
+	type UnsignedInterval = ConstU32<128>;
+	type UnsignedPriority = UnsignedPriority;
+	type MaxPrices = ConstU32<64>;
 	type CustomType = u32;
 	type Amount = ConstU128<500>;
 	type Currency = Balances;
