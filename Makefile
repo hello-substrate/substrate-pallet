@@ -10,7 +10,7 @@ br:
 clear:
 	rm ~/.cargo/.package-cache
 
-rr:
+r:
 	cargo run --release -- --dev
 
 c:
